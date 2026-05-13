@@ -1,0 +1,97 @@
+// 语言列表
+export const LANGUAGES = [
+  { key: 'en', label: 'English', flag: '🇬🇧' },
+  { key: 'ja', label: '日本語', flag: '🇯🇵' },
+]
+
+// 各语言的场景列表
+export const SCENARIOS = {
+  en: [
+    { value: 'restaurant', label: 'Restaurant Ordering' },
+    { value: 'hotel', label: 'Hotel Check-in' },
+    { value: 'business', label: 'Business Meeting' },
+    { value: 'casual', label: 'Casual Chat' },
+    { value: 'custom', label: 'Custom' },
+  ],
+  ja: [
+    { value: 'restaurant', label: 'レストランで注文' },
+    { value: 'hotel', label: 'ホテルチェックイン' },
+    { value: 'station', label: '駅で切符購入' },
+    { value: 'convenience', label: 'コンビニで買い物' },
+    { value: 'casual', label: '日常会話' },
+    { value: 'custom', label: 'カスタム' },
+  ],
+}
+
+// 各语言的纠错敏感度标签
+export const SENSITIVITY_LABELS = {
+  en: { loose: 'Loose', normal: 'Normal', strict: 'Strict' },
+  ja: { loose: 'ゆるめ', normal: '標準', strict: 'きびしめ' },
+}
+
+// UI 文案（需要国际化的固定文字）
+export const UI_TEXT = {
+  en: {
+    scenarioSetup: 'Scenario Setup',
+    scenario: 'Scenario',
+    conversationGoal: 'Conversation Goal',
+    random: 'Random',
+    sensitivity: 'Sensitivity',
+    maxRounds: 'Max Rounds',
+    targetKnowledge: 'Target Knowledge Points',
+    startChat: 'Start Conversation',
+    knowledgePoints: 'Knowledge Points',
+    lookUp: 'Look Up',
+    searchPlaceholder: 'Search knowledge points...',
+    dictPlaceholder: 'Ask about a word or phrase...',
+    noPoints: 'No knowledge points yet. Start a conversation!',
+    learningProgress: 'Learning Progress',
+    conversationsThisWeek: 'Conversations this week',
+    confirmedPoints: 'Confirmed Knowledge Points',
+    dueForReview: 'Due for Review',
+    startQuiz: 'Start Review Quiz',
+    back: 'Back',
+    endConversation: 'End Conversation',
+  },
+  ja: {
+    scenarioSetup: 'シーン設定',
+    scenario: 'シーン',
+    conversationGoal: '会話の目標',
+    random: 'ランダム',
+    sensitivity: '訂正レベル',
+    maxRounds: '最大往復数',
+    targetKnowledge: '目標単語数',
+    startChat: '会話を始める',
+    knowledgePoints: '単語帳',
+    lookUp: '辞書',
+    searchPlaceholder: '単語を検索...',
+    dictPlaceholder: '単語やフレーズを入力...',
+    noPoints: 'まだ単語がありません。会話を始めましょう！',
+    learningProgress: '学習の進捗',
+    conversationsThisWeek: '今週の会話数',
+    confirmedPoints: '確認済み単語',
+    dueForReview: '復習待ち',
+    startQuiz: '復習テストを始める',
+    back: '戻る',
+    endConversation: '会話を終了',
+  },
+}
+
+// 知识类型配置（英文版）
+export const TYPE_CONFIG = {
+  word: { label: 'Word', color: '#1677ff', bg: '#e6f4ff' },
+  phrase: { label: 'Phrase', color: '#52c41a', bg: '#f6ffed' },
+  grammar: { label: 'Grammar', color: '#fa8c16', bg: '#fff7e6' },
+  collocation: { label: 'Collocation', color: '#eb2f96', bg: '#fff0f6' },
+}
+
+// 知识类型配置（日文版）
+export const JA_TYPE_CONFIG = {
+  word: { label: '単語', color: '#1677ff', bg: '#e6f4ff' },
+  phrase: { label: 'フレーズ', color: '#52c41a', bg: '#f6ffed' },
+  grammar: { label: '文法', color: '#fa8c16', bg: '#fff7e6' },
+  collocation: { label: 'コロケーション', color: '#eb2f96', bg: '#fff0f6' },
+  keigo: { label: '敬語', color: '#722ed1', bg: '#f9f0ff' },
+  joshi: { label: '助詞', color: '#13c2c2', bg: '#e6fffb' },
+  katsuyou: { label: '活用', color: '#f5222d', bg: '#fff1f0' },
+}

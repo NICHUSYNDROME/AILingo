@@ -1,0 +1,340 @@
+.scenario-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scenario-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 14px 0;
+  text-align: center;
+}
+
+/* Fields wrapper: single column, constrained width */
+.scenario-fields-wrapper {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Each field: label above, control below, full width */
+.scenario-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.scenario-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.scenario-select {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--input-bg);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  appearance: auto;
+}
+
+.scenario-select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.scenario-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  background: var(--input-bg);
+}
+
+.scenario-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.sensitivity-group {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 36px;
+  width: 100%;
+}
+
+.sensitivity-btn {
+  flex: 1;
+  height: 36px;
+  border: none;
+  background: var(--input-bg);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 12px;
+  transition: all 0.2s;
+  border-right: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.sensitivity-btn:last-child {
+  border-right: none;
+}
+
+.sensitivity-btn:hover {
+  background: var(--hover-bg);
+}
+
+.sensitivity-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  font-weight: 500;
+}
+
+.start-btn {
+  width: 100%;
+  height: 38px;
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 0.2s;
+}
+
+.start-btn:hover {
+  background: var(--accent-blue-hover);
+}
+
+.start-btn:active {
+  background: var(--accent-blue-active);
+}
+
+/* Confirm dialog overlay */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-dialog {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90vw;
+  box-shadow: var(--shadow);
+}
+
+.confirm-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 20px 0;
+}
+
+.confirm-body {
+  margin-bottom: 24px;
+}
+
+.confirm-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.confirm-item:last-child {
+  border-bottom: none;
+}
+
+.confirm-label {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.confirm-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.confirm-goal-text {
+  max-width: 240px;
+  text-align: right;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-cancel-btn {
+  height: 36px;
+  padding: 0 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-cancel-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.confirm-ok-btn {
+  height: 36px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.confirm-ok-btn:hover {
+  background: var(--accent-blue-hover);
+}
+
+.confirm-error {
+  color: var(--error-color);
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+/* Goal input row: input + random button on the same line */
+.goal-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.goal-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Textarea for goal input — auto-resize, matches input styles */
+.goal-textarea {
+  resize: none;
+  overflow-y: hidden;
+  min-height: 38px;
+  max-height: 100px;
+  padding: 7px 10px;
+  line-height: 1.5;
+  font-family: inherit;
+  box-sizing: border-box;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.goal-textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.goal-random-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.goal-random-btn:hover:not(:disabled) {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--info-bg);
+}
+
+.goal-random-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Custom scenario input — shown when "自定义" is selected */
+.custom-scenario-input {
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--input-bg);
+}
+
+.custom-scenario-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.custom-scenario-input::placeholder {
+  color: var(--text-tertiary);
+}
