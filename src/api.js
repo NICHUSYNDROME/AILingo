@@ -223,7 +223,11 @@ function buildJapaneseSystemPrompt(ctx) {
 export async function getApiKey() {
   const key = await getItem('deepseek_api_key')
   if (!key) {
-    throw new Error('API Key 未配置，请在设置中配置 DeepSeek API Key')
+    const newKey = prompt('请输入你的 DeepSeek API Key：')
+    if (newKey) {
+      await setItem('deepseek_api_key', newKey)
+      return newKey
+    }
   }
   return key
 }
@@ -1566,49 +1570,5 @@ Sensitivity setting: ${sensitivity}`
   return {
     tips: parsed?.tips || [],
     knowledgePoints: parsed?.knowledgePoints || []
-  }
-}
-
-/**
- * 测试 DeepSeek API Key 是否有效
- */
-export async function testDeepSeekKey(key) {
-  try {
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 1
-      })
-    })
-    if (response.ok) return { valid: true }
-    const errorData = await response.json().catch(() => ({}))
-    return { valid: false, error: errorData.error?.message || `API 返回错误: ${response.status}` }
-  } catch (error) {
-    return { valid: false, error: `网络请求失败: ${error.message}` }
-  }
-}
-
-/**
- * 测试千问 TTS API Key 是否有效
- */
-export async function testTTSKey(key) {
-  try {
-    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/tasks', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    if (response.ok) return { valid: true }
-    return { valid: false, error: `API 返回错误: ${response.status}` }
-  } catch (error) {
-    return { valid: false, error: `网络请求失败: ${error.message}` }
   }
 }
