@@ -4,25 +4,13 @@
  * Lightweight Node.js backend that proxies TTS requests to Qwen DashScope API.
  * API key is passed from the frontend per-request — never stored server-side.
  *
- * Heartbeat mechanism: the browser sends a POST /ping every 10 seconds.
- * If no ping is received for 30 seconds, the server assumes the browser
- * has been closed and shuts itself down automatically.
+ * This server runs as a persistent service and is started/stopped by the
+ * Electron main process. It does not use heartbeat-based auto-shutdown.
  */
 
 const http = require('http')
 
 const PORT = process.env.PORT || 3001
-// === Heartbeat detection ===
-let lastHeartbeat = Date.now()
-const HEARTBEAT_TIMEOUT = 30000 // 30 秒无心跳则自动退出
-
-const heartbeatCheck = setInterval(() => {
-  if (Date.now() - lastHeartbeat > HEARTBEAT_TIMEOUT) {
-    console.log('⏰ 心跳超时（浏览器已关闭），自动停止服务...')
-    clearInterval(heartbeatCheck)
-    process.exit(0)
-  }
-}, 5000) // 每 5 秒检查一次
 
 const server = http.createServer((req, res) => {
   // CORS — allow frontend cross-origin access
@@ -33,14 +21,6 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204)
     res.end()
-    return
-  }
-
-  // === Heartbeat ping endpoint ===
-  if (req.method === 'POST' && req.url === '/ping') {
-    lastHeartbeat = Date.now()
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ status: 'ok', timestamp: lastHeartbeat }))
     return
   }
 
@@ -59,7 +39,7 @@ const server = http.createServer((req, res) => {
 
         // Debug: log request (masked API key)
         console.log('Sending to Qwen:', {
-          model: 'qwen3-tts-flash',
+          model: 'qwen3-tts-instruct-flash',
           text: text.substring(0, 30),
           voice,
           languageType,
@@ -74,14 +54,16 @@ const server = http.createServer((req, res) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'qwen3-tts-flash',
+            model: 'qwen3-tts-instruct-flash',
             input: {
               text: text,
-              voice: voice || 'Ethan',
+              voice: voice || 'Kai',
               language_type: languageType || 'Japanese',
               speed: 1.0,
               volume: 1.0,
             },
+            instructions: '语速偏慢，语气沉稳冷静，像纪录片旁白一样平稳地朗读。',
+            optimize_instructions: true,
           }),
         })
 

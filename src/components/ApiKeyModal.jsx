@@ -1,7 +1,18 @@
-import React, { useState } from 'react'
-import { setItem } from '../utils/storage'
+import { useState, useEffect, useRef } from 'react'
+import { getItem, setItem } from '../utils/storage'
 import { testDeepSeekKey, testTTSKey } from '../api'
 import './ApiKeyModal.css'
+
+/**
+ * 脱敏 API Key
+ * 如果 key 长度 <= 8，返回 '****'
+ * 否则保留前 4 个字符 + '****' + 后 4 个字符
+ */
+function maskApiKey(key) {
+  if (!key) return ''
+  if (key.length <= 8) return '****'
+  return key.slice(0, 4) + '****' + key.slice(-4)
+}
 
 /**
  * API Key 配置弹窗
@@ -16,8 +27,44 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
   const [showTTS, setShowTTS] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState(null) // { type: 'success'|'error'|'info', message: string }
+  const [hasExistingDeepseek, setHasExistingDeepseek] = useState(false)
+  const [hasExistingTTS, setHasExistingTTS] = useState(false)
+
+  const originalDeepseekKeyRef = useRef('')
+  const originalTTSKeyRef = useRef('')
 
   const isWelcome = mode === 'welcome'
+
+  // 组件挂载时读取已保存的 Key，脱敏后回显
+  useEffect(() => {
+    const loadSavedKeys = async () => {
+      const savedDeepseek = await getItem('deepseek_api_key')
+      console.log('[ApiKeyModal] getItem deepseek_api_key:', savedDeepseek)
+      if (savedDeepseek) {
+        originalDeepseekKeyRef.current = savedDeepseek
+        const maskedDeepseek = maskApiKey(savedDeepseek)
+        setDeepseekKey(maskedDeepseek)
+        console.log('[ApiKeyModal] masked deepseek:', maskedDeepseek)
+        console.log('[ApiKeyModal] deepseekKey state after set:', maskedDeepseek)
+        setHasExistingDeepseek(true)
+      }
+
+      const savedTTS = await getItem('qwen_tts_api_key')
+      console.log('[ApiKeyModal] getItem qwen_tts_api_key:', savedTTS)
+      if (savedTTS) {
+        originalTTSKeyRef.current = savedTTS
+        const maskedTTS = maskApiKey(savedTTS)
+        setTtsKey(maskedTTS)
+        console.log('[ApiKeyModal] masked tts:', maskedTTS)
+        console.log('[ApiKeyModal] ttsKey state after set:', maskedTTS)
+        setHasExistingTTS(true)
+      }
+
+      console.log('[ApiKeyModal] loadSavedKeys finished, deepseekKey will be:', maskApiKey(savedDeepseek || ''))
+    }
+
+    loadSavedKeys()
+  }, [])
 
   // 在 Electron 中用系统浏览器打开链接，否则用 window.open
   const openExternalLink = (url) => {
@@ -29,11 +76,19 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
   }
 
   const handleTestAndSave = async () => {
+    // 确定实际要使用的 Key：如果用户没有修改脱敏值，使用原始完整 Key；否则使用用户新输入的值
+    const actualDeepseekKey = hasExistingDeepseek && deepseekKey === maskApiKey(originalDeepseekKeyRef.current)
+      ? originalDeepseekKeyRef.current
+      : deepseekKey.trim()
+    const actualTTSKey = hasExistingTTS && ttsKey === maskApiKey(originalTTSKeyRef.current)
+      ? originalTTSKeyRef.current
+      : ttsKey.trim()
+
     // 清除旧结果
     setTestResult(null)
 
     // 校验必填
-    if (!deepseekKey.trim()) {
+    if (!actualDeepseekKey) {
       setTestResult({ type: 'error', message: '请输入 DeepSeek API Key' })
       return
     }
@@ -42,7 +97,7 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
     setTestResult({ type: 'info', message: '正在测试 DeepSeek API Key...' })
 
     // 测试 DeepSeek
-    const dsResult = await testDeepSeekKey(deepseekKey.trim())
+    const dsResult = await testDeepSeekKey(actualDeepseekKey)
     if (!dsResult.valid) {
       setTestResult({ type: 'error', message: `DeepSeek Key 无效：${dsResult.error}` })
       setTesting(false)
@@ -50,14 +105,18 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
     }
 
     // DeepSeek 有效，保存
-    await setItem('deepseek_api_key', deepseekKey.trim())
+    await setItem('deepseek_api_key', actualDeepseekKey)
+    originalDeepseekKeyRef.current = actualDeepseekKey
+    setHasExistingDeepseek(true)
 
     // 如果填了 TTS Key，测试并保存（失败不影响）
-    if (ttsKey.trim()) {
+    if (actualTTSKey) {
       setTestResult({ type: 'info', message: '正在测试千问 TTS API Key...' })
-      const ttsResult = await testTTSKey(ttsKey.trim())
+      const ttsResult = await testTTSKey(actualTTSKey)
       if (ttsResult.valid) {
-        await setItem('qwen_tts_api_key', ttsKey.trim())
+        await setItem('qwen_tts_api_key', actualTTSKey)
+        originalTTSKeyRef.current = actualTTSKey
+        setHasExistingTTS(true)
       } else {
         // TTS 失败仅提示，不阻塞流程
         console.warn('TTS Key 测试失败:', ttsResult.error)

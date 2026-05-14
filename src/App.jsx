@@ -9,7 +9,7 @@ import QuizPanel from './components/QuizPanel'
 import { generateConversationGoal, testDeepSeekKey } from './api'
 import ApiKeyModal from './components/ApiKeyModal'
 import { getItem, setItem, removeItem } from './utils/storage'
-import { startHeartbeat, stopHeartbeat } from './utils/tts'
+
 import { useKnowledgePoints } from './hooks/useKnowledgePoints'
 import { useLanguage } from './context/LanguageContext'
 import { useTheme } from './context/ThemeContext'
@@ -129,12 +129,6 @@ function App() {
     loadMutedState()
   }, [])
 
-  // === Heartbeat: keep TTS backend alive while browser tab is open ===
-  // Starts on mount, stops on unmount (tab close / navigation away)
-  useEffect(() => {
-    startHeartbeat()
-    return () => stopHeartbeat()
-  }, [])
 
   // === Three-state management: 'idle' | 'chatting' | 'quiz' ===
   const [centerState, setCenterState] = useState('idle')

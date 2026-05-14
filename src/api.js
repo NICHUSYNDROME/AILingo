@@ -1,5 +1,53 @@
 import { getItem, removeItem, setItem } from './utils/storage'
 
+/**
+ * Test a DeepSeek API key by making a minimal API call.
+ * @param {string} key - The API key to test
+ * @returns {Promise<{valid: boolean, error?: string}>}
+ */
+export async function testDeepSeekKey(key) {
+  try {
+    const response = await fetch('https://api.deepseek.com/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    })
+    if (response.ok) {
+      return { valid: true }
+    }
+    const data = await response.json().catch(() => ({}))
+    return { valid: false, error: data.error?.message || `HTTP ${response.status}` }
+  } catch (error) {
+    return { valid: false, error: error.message }
+  }
+}
+
+/**
+ * Test a Qwen TTS API key by making a minimal API call.
+ * @param {string} key - The TTS API key to test
+ * @returns {Promise<{valid: boolean, error?: string}>}
+ */
+export async function testTTSKey(key) {
+  try {
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: 'qwen-turbo',
+        input: { messages: [{ role: 'user', content: 'hi' }] },
+      }),
+    })
+    if (response.ok) {
+      return { valid: true }
+    }
+    const data = await response.json().catch(() => ({}))
+    return { valid: false, error: data.message || `HTTP ${response.status}` }
+  } catch (error) {
+    return { valid: false, error: error.message }
+  }
+}
+
 const API_URL = 'https://api.deepseek.com/chat/completions'
 
 /**
@@ -377,11 +425,11 @@ export async function generateConversationGoal(scenario, language = 'en') {
   if (!apiKey) return ''
 
   const systemPrompt = language === 'ja'
-    ? 'あなたは会話シーンアシスタントです。ユーザーは日本語を練習しています。選択されたシーンに基づいて、具体的な会話目標を生成してください。日本語で返し、複数のサブ目標は改行で区切ってください。最大3つ。\n\n' +
+    ? 'あなたは会話シーンアシスタントです。ユーザーは日本語を練習しています。選択されたシーンに基づいて、具体的な会話目標を生成してください。中文で返し、複数のサブ目標は改行で区切ってください。最大3つ。\n\n' +
       '例（レストラン注文）：\n' +
-      '日本語でメインディッシュを注文する\n' +
-      '本日のおすすめを日本語で尋ねる\n' +
-      '会計時に領収書を日本語で依頼する\n\n' +
+      '用日语点一道主菜\n' +
+      '用日语询问今日特色菜\n' +
+      '用日语请求开发票\n\n' +
       'そのままテキストだけを返してください。'
     : '用户正在练习英语对话，目标是提升英语口语能力。你是一个对话场景助手。根据用户选择的场景，生成具体的英语对话练习目标。\n\n' +
       '要求：\n' +

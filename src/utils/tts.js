@@ -7,52 +7,17 @@
  *
  * Audio responses are cached in-memory (Map) for the current page session
  * to avoid redundant API calls for the same text.
- *
- * Heartbeat: sends a POST /ping to the backend every 10 seconds while the
- * browser tab is open. If the tab is closed, the backend detects the timeout
- * and shuts itself down automatically.
  */
 
-import { getItem, setItem } from './storage'
+import { getItem } from './storage'
 
 const TTS_PROXY_URL = 'http://localhost:3001/tts'
-const PING_URL = 'http://localhost:3001/ping'
 
 // In-memory audio cache: key = `${language}_${voice}_${text[:100]}`, value = audioUrl
 const audioCache = new Map()
 const MAX_CACHE_SIZE = 50
 
-// === Heartbeat ===
-let heartbeatTimer = null
-
-/**
- * Start sending periodic heartbeat pings to the TTS backend.
- * The backend will auto-shutdown if no ping is received for 30 seconds.
- * Safe to call multiple times — only one timer runs at a time.
- */
-export function startHeartbeat() {
-  if (heartbeatTimer) return
-  console.log('[TTS] 心跳检测已启动')
-  heartbeatTimer = setInterval(async () => {
-    try {
-      await fetch(PING_URL, { method: 'POST' })
-    } catch {
-      // Backend may have shut down — stop sending
-      stopHeartbeat()
-    }
-  }, 10000) // 每 10 秒一次
-}
-
-/**
- * Stop sending heartbeat pings.
- */
-export function stopHeartbeat() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = null
-    console.log('[TTS] 心跳检测已停止')
-  }
-}
+let currentAudio = null
 
 /**
  * Check if TTS is available (always true for proxy-based approach).
@@ -63,7 +28,30 @@ export function isTTSAvailable() {
 }
 
 /**
+ * Stop any currently playing TTS audio immediately.
+ */
+export function stopSpeaking() {
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio.currentTime = 0
+    currentAudio.onended = null
+    currentAudio.onerror = null
+    currentAudio = null
+  }
+}
+
+/**
+ * Check if TTS is currently speaking.
+ * @returns {boolean}
+ */
+export function isSpeaking() {
+  return currentAudio !== null && !currentAudio.paused
+}
+
+/**
  * Speak the given text using Qwen TTS via the local proxy server.
+ *
+ * Automatically stops any previously playing audio before starting a new one.
  *
  * The TTS API key must be configured in advance via the settings modal
  * (ApiKeyModal). If no key is stored, a warning is logged and the call
@@ -78,6 +66,9 @@ export function isTTSAvailable() {
  * @returns {Promise<void>}
  */
 export async function speak(text, language = 'en', apiKey = null) {
+  // Stop any currently playing audio before starting new one
+  stopSpeaking()
+
   // Resolve API key: param → storage
   if (!apiKey) {
     apiKey = await getItem('qwen_tts_api_key')
@@ -88,9 +79,9 @@ export async function speak(text, language = 'en', apiKey = null) {
     return
   }
 
-  // Voice — qwen3-tts-flash supports: Cherry, Serena, Ethan, Chelsie
-  // Ethan is the only male voice available
-  const voice = 'Ethan'
+  // Voice — qwen3-tts-instruct-flash supports: Cherry, Serena, Ethan, Chelsie, Ryan
+  // Ryan is a male voice
+  const voice = 'Kai'
   const languageType = language === 'ja' ? 'Japanese' : 'English'
 
   // Generate cache key (truncate text to 100 chars to avoid excessively long keys)
@@ -100,6 +91,9 @@ export async function speak(text, language = 'en', apiKey = null) {
   const cachedUrl = audioCache.get(cacheKey)
   if (cachedUrl) {
     const audio = new Audio(cachedUrl)
+    currentAudio = audio
+    audio.onended = () => { currentAudio = null }
+    audio.onerror = () => { currentAudio = null }
     await audio.play()
     return
   }
@@ -113,6 +107,9 @@ export async function speak(text, language = 'en', apiKey = null) {
         apiKey,
         voice,
         languageType,
+        model: 'qwen3-tts-instruct-flash',
+        instructions: '语速偏慢，语气沉稳冷静，像纪录片旁白一样平稳地朗读。',
+        optimize_instructions: true,
       }),
     })
 
@@ -129,6 +126,9 @@ export async function speak(text, language = 'en', apiKey = null) {
       audioCache.set(cacheKey, data.audioUrl)
 
       const audio = new Audio(data.audioUrl)
+      currentAudio = audio
+      audio.onended = () => { currentAudio = null }
+      audio.onerror = () => { currentAudio = null }
       await audio.play()
     } else {
       console.error('TTS 请求失败:', data.error || data.detail)

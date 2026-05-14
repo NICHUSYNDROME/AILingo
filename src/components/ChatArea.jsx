@@ -12,7 +12,7 @@ import {
   extractSpecificKnowledge
 } from '../api'
 import { logActivity } from '../utils/learningLog'
-import { speak, isTTSAvailable } from '../utils/tts'
+import { speak, stopSpeaking, isSpeaking, isTTSAvailable } from '../utils/tts'
 import './ChatArea.css'
 
 // ===== Helper: escape HTML special chars =====
@@ -244,6 +244,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showBackConfirm, setShowBackConfirm] = useState(false)
   const [speakingMsgId, setSpeakingMsgId] = useState(null)
+  const playingMsgIdRef = useRef(null)
   const listRef = useRef(null)
   const initialTriggered = useRef(false)
   const summaryTriggered = useRef(false)
@@ -997,6 +998,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     isSendingRef.current = false
     setSessionConfirmedCount(0)
     setSpeakingMsgId(null)
+    playingMsgIdRef.current = null
     setTodos([])
     setAnalysisResults({})
     setHintsExpandedMap({})
@@ -1160,14 +1162,22 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                 </div>
                 {msg.role === 'assistant' && isTTSAvailable() && (
                   <button className={`message-tts-btn ${speakingMsgId === i ? 'speaking' : ''}`} onClick={async () => {
-                    if (speakingMsgId === i) {
-                      window.speechSynthesis.cancel()
+                    if (playingMsgIdRef.current === i && isSpeaking()) {
+                      stopSpeaking()
+                      playingMsgIdRef.current = null
                       setSpeakingMsgId(null)
                       return
                     }
+                    playingMsgIdRef.current = i
                     setSpeakingMsgId(i)
-                    await speak(msg.content, language)
-                    setSpeakingMsgId(null)
+                    try {
+                      await speak(msg.content, language)
+                    } finally {
+                      if (playingMsgIdRef.current === i) {
+                        playingMsgIdRef.current = null
+                        setSpeakingMsgId(null)
+                      }
+                    }
                   }} title={language === 'ja' ? '朗读（日语）' : 'Read aloud'}>{speakingMsgId === i ? '⏳' : '🔊'}</button>
                 )}
               </div>
