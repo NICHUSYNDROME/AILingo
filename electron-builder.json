@@ -1,0 +1,27 @@
+{
+  "appId": "com.ailingo.app",
+  "productName": "AILingo",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "server/**/*",
+    "daemon.cjs",
+    "package.json"
+  ],
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "public/icon.icns",
+    "category": "public.app-category.education"
+  },
+  "win": {
+    "target": ["nsis"],
+    "icon": "public/icon.ico"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "icon": "public/icon.png"
+  }
+}

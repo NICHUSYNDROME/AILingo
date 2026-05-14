@@ -2,8 +2,11 @@
  * Learning Activity Log
  *
  * Records daily learning activities (conversation, knowledge confirmation, quiz)
- * to localStorage for display in the heatmap calendar and statistics dashboard.
+ * to localStorage and Electron storage for display in the heatmap calendar and
+ * statistics dashboard.
  */
+
+import { getItem, setItem } from './storage'
 
 function getStorageKey(language) {
   return language === 'ja' ? 'ja_learning_log' : 'en_learning_log'
@@ -25,7 +28,7 @@ function getTodayKey() {
  * @param {string} [language='en'] - Language key ('en' | 'ja')
  * @returns {Object} Keyed by 'YYYY-MM-DD', each value is { conversation, knowledge, quiz }
  */
-function loadLog(language = 'en') {
+export function loadLog(language = 'en') {
   const STORAGE_KEY = getStorageKey(language)
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -36,17 +39,19 @@ function loadLog(language = 'en') {
 }
 
 /**
- * Save the full learning log to localStorage.
+ * Save the full learning log to both localStorage and Electron storage.
  * @param {Object} log - The log object
  * @param {string} [language='en'] - Language key ('en' | 'ja')
  */
-function saveLog(log, language = 'en') {
+export function saveLog(log, language = 'en') {
   const STORAGE_KEY = getStorageKey(language)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(log))
   } catch {
     // storage full — silently ignore
   }
+  // 异步写入 Electron 存储
+  setItem(STORAGE_KEY, JSON.stringify(log)).catch(() => {})
 }
 
 /**

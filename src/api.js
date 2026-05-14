@@ -1,3 +1,5 @@
+import { getItem, removeItem, setItem } from './utils/storage'
+
 const API_URL = 'https://api.deepseek.com/chat/completions'
 
 /**
@@ -218,13 +220,10 @@ function buildJapaneseSystemPrompt(ctx) {
   return parts.filter(Boolean).join('\n')
 }
 
-export function getApiKey() {
-  let key = localStorage.getItem('deepseek_api_key')
+export async function getApiKey() {
+  const key = await getItem('deepseek_api_key')
   if (!key) {
-    key = prompt('请输入你的 DeepSeek API Key：')
-    if (key) {
-      localStorage.setItem('deepseek_api_key', key)
-    }
+    throw new Error('API Key 未配置，请在设置中配置 DeepSeek API Key')
   }
   return key
 }
@@ -281,7 +280,7 @@ export async function sendToAI(
   isLastRound = false,
   language = 'en'
 ) {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) {
     return language === 'ja'
       ? '有効なAPI Keyを入力してからもう一度試してください。'
@@ -352,7 +351,7 @@ export async function sendToAI(
 
     if (!response.ok) {
       if (response.status === 401) {
-        localStorage.removeItem('deepseek_api_key')
+        await removeItem('deepseek_api_key')
         return 'API Key is invalid or expired. Please re-enter.'
       }
       return `Request failed (${response.status}). Please try again later.`
@@ -370,7 +369,7 @@ export async function sendToAI(
  * Calls DeepSeek API to produce goal descriptions in the target language.
  */
 export async function generateConversationGoal(scenario, language = 'en') {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return ''
 
   const systemPrompt = language === 'ja'
@@ -446,7 +445,7 @@ export async function generateConversationGoal(scenario, language = 'en') {
  * Generate a learning summary of the completed conversation.
  */
 export async function generateSummary(conversationHistory, ctx, language = 'en') {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return 'Unable to generate summary: Please provide a valid API Key.'
 
   const systemPrompt = language === 'ja'
@@ -572,7 +571,7 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
  * @returns {Array<number>} Array of completed TODO IDs (1-based)
  */
 export async function checkTaskCompletion(goal, todos, conversationHistory, language = 'en') {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return []
 
   const pendingTodos = todos.filter(t => !t.completed)
@@ -648,7 +647,7 @@ export async function checkTaskCompletion(goal, todos, conversationHistory, lang
  * @returns {Object|null} Structured knowledge point or null on failure
  */
 export async function extractSpecificKnowledge(trigger, context, language = 'en') {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return null
 
   let triggerDescription = ''
@@ -812,7 +811,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
 export async function correctUserMessage(userMessage, sensitivity = 'normal', language = 'en') {
   if (!userMessage || userMessage.trim() === '') return null
 
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return null
 
   const systemPrompt = language === 'ja'
@@ -905,7 +904,7 @@ Rules:
 export async function analyzeGrammar(userMessage, correctedMessage, conversationHistory, sensitivity = 'normal', language = 'en') {
   if (!userMessage || userMessage.trim() === '') return null
 
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return null
 
   const historyText = conversationHistory.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n')
@@ -1030,7 +1029,7 @@ Please analyze spelling errors and grammar errors, and return plain text.`
 export async function generateHints(assistantReply, language = 'en') {
   if (!assistantReply || assistantReply.trim() === '') return null
 
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return null
 
   const systemPrompt = language === 'ja'
@@ -1114,7 +1113,7 @@ Rules:
 export async function extractCorrectionsFromReply(assistantReply, language = 'en') {
   if (!assistantReply || assistantReply.trim() === '') return null
 
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return null
 
   const systemPrompt = language === 'ja'
@@ -1304,7 +1303,7 @@ Output 4:
  * 合并 2B 和 2D 的输出，去重后输出结构化的 tips 和 knowledgePoints
  */
 export async function summarizeTipsAndExtractKnowledge(grammarAnalysis, extractedCorrections, sensitivity = 'normal', language = 'en') {
-  const apiKey = getApiKey()
+  const apiKey = await getApiKey()
   if (!apiKey) return { tips: [], knowledgePoints: [] }
 
   const systemPrompt = language === 'ja'
@@ -1567,5 +1566,49 @@ Sensitivity setting: ${sensitivity}`
   return {
     tips: parsed?.tips || [],
     knowledgePoints: parsed?.knowledgePoints || []
+  }
+}
+
+/**
+ * 测试 DeepSeek API Key 是否有效
+ */
+export async function testDeepSeekKey(key) {
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1
+      })
+    })
+    if (response.ok) return { valid: true }
+    const errorData = await response.json().catch(() => ({}))
+    return { valid: false, error: errorData.error?.message || `API 返回错误: ${response.status}` }
+  } catch (error) {
+    return { valid: false, error: `网络请求失败: ${error.message}` }
+  }
+}
+
+/**
+ * 测试千问 TTS API Key 是否有效
+ */
+export async function testTTSKey(key) {
+  try {
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/tasks', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    if (response.ok) return { valid: true }
+    return { valid: false, error: `API 返回错误: ${response.status}` }
+  } catch (error) {
+    return { valid: false, error: `网络请求失败: ${error.message}` }
   }
 }

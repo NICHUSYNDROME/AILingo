@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { getItem, setItem } from '../utils/storage'
 import { getLocalDateString } from '../utils/date'
 
 function getStorageKey(language) {
@@ -44,12 +45,17 @@ function loadFromStorage(language) {
 
 function saveToStorage(points, language) {
   const STORAGE_KEY = getStorageKey(language)
+  // 同步写入 localStorage（开发环境）
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(points))
-    console.log(`[useKnowledgePoints] 知识点已保存到 localStorage (${STORAGE_KEY})，数量:`, points.length)
   } catch (e) {
-    console.error('[useKnowledgePoints] 保存知识点失败:', e)
+    console.error('[useKnowledgePoints] 保存知识点到 localStorage 失败:', e)
   }
+  // 异步写入 Electron 存储（不等待，避免阻塞渲染）
+  setItem(STORAGE_KEY, JSON.stringify(points)).catch((e) => {
+    console.error('[useKnowledgePoints] 保存知识点到 Electron 存储失败:', e)
+  })
+  console.log(`[useKnowledgePoints] 知识点已保存 (${STORAGE_KEY})，数量:`, points.length)
 }
 
 function generateId() {
@@ -66,6 +72,29 @@ export function useKnowledgePoints(language = 'en') {
     console.log('[useKnowledgePoints] 初始化，加载知识点数:', loaded.length)
     return loaded
   })
+  const [isLoading, setIsLoading] = useState(true)
+  const loadedRef = useRef(false)
+
+  // Electron 环境下，从主进程文件异步加载真实数据
+  useEffect(() => {
+    async function loadFromElectronStorage() {
+      const STORAGE_KEY = getStorageKey(language)
+      const stored = await getItem(STORAGE_KEY)
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setKnowledgePoints(parsed)
+          }
+        } catch (e) {
+          console.error('[useKnowledgePoints] 从 Electron 存储加载解析失败:', e)
+        }
+      }
+      loadedRef.current = true
+      setIsLoading(false)
+    }
+    loadFromElectronStorage()
+  }, [language])
 
   const addPoint = useCallback((data) => {
     // Debug: log received phonetic value

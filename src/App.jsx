@@ -6,7 +6,9 @@ import KnowledgeSidebar from './components/KnowledgeSidebar'
 import LookUpPanel from './components/LookUpPanel'
 import ProgressDashboard from './components/ProgressDashboard'
 import QuizPanel from './components/QuizPanel'
-import { getApiKey, generateConversationGoal } from './api'
+import { generateConversationGoal, testDeepSeekKey } from './api'
+import ApiKeyModal from './components/ApiKeyModal'
+import { getItem, setItem, removeItem } from './utils/storage'
 import { startHeartbeat, stopHeartbeat } from './utils/tts'
 import { useKnowledgePoints } from './hooks/useKnowledgePoints'
 import { useLanguage } from './context/LanguageContext'
@@ -80,7 +82,32 @@ function App() {
   const { language, setLanguage, uiText } = useLanguage()
   const { theme, setTheme } = useTheme()
 
-  // === TTS mute state (persisted to localStorage) ===
+  // === API Key 弹窗状态 ===
+  const [showApiModal, setShowApiModal] = useState(false)
+  const [modalMode, setModalMode] = useState('welcome') // 'welcome' | 'settings'
+  const [appReady, setAppReady] = useState(false)
+
+  // 初始化：检查 API Key
+  useEffect(() => {
+    async function checkApiKey() {
+      const key = await getItem('deepseek_api_key')
+      if (!key) {
+        setModalMode('welcome')
+        setShowApiModal(true)
+        setAppReady(true)
+        return
+      }
+      const result = await testDeepSeekKey(key)
+      if (!result.valid) {
+        setModalMode('welcome')
+        setShowApiModal(true)
+      }
+      setAppReady(true)
+    }
+    checkApiKey()
+  }, [])
+
+  // === TTS mute state (persisted to localStorage & Electron storage) ===
   const [isMuted, setIsMuted] = useState(() => {
     return localStorage.getItem('tts_muted') === 'true'
   })
@@ -88,7 +115,19 @@ function App() {
   // Persist mute state changes
   useEffect(() => {
     localStorage.setItem('tts_muted', isMuted ? 'true' : 'false')
+    setItem('tts_muted', isMuted ? 'true' : 'false') // 异步写入 Electron 存储
   }, [isMuted])
+
+  // Electron 环境下，从主进程文件加载真实值
+  useEffect(() => {
+    async function loadMutedState() {
+      const saved = await getItem('tts_muted')
+      if (saved !== null) {
+        setIsMuted(saved === 'true')
+      }
+    }
+    loadMutedState()
+  }, [])
 
   // === Heartbeat: keep TTS backend alive while browser tab is open ===
   // Starts on mount, stops on unmount (tab close / navigation away)
@@ -274,7 +313,7 @@ function App() {
     setSidebarContentType('dict')
 
     try {
-      const apiKey = getApiKey()
+      const apiKey = await getItem('deepseek_api_key')
       if (!apiKey) {
         setSidebarContent({ error: '⚠️ Please provide a valid API Key first.' })
         setSidebarContentType('dict')
@@ -301,7 +340,7 @@ function App() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.removeItem('deepseek_api_key')
+          await removeItem('deepseek_api_key')
           setSidebarContent({ error: '⚠️ API Key is invalid or expired.' })
         } else {
           setSidebarContent({ error: `❌ Query failed (${response.status}).` })
@@ -425,7 +464,7 @@ function App() {
       setSidebarContentType('dict')
 
       try {
-        const apiKey = getApiKey()
+        const apiKey = await getItem('deepseek_api_key')
         if (!apiKey) {
           setSidebarContent({ error: '⚠️ Please provide a valid API Key first.' })
           setSidebarContentType('dict')
@@ -452,7 +491,7 @@ function App() {
 
         if (!response.ok) {
           if (response.status === 401) {
-            localStorage.removeItem('deepseek_api_key')
+            await removeItem('deepseek_api_key')
             setSidebarContent({ error: '⚠️ API Key is invalid or expired.' })
           } else {
             setSidebarContent({ error: `❌ Query failed (${response.status}).` })
@@ -599,19 +638,27 @@ function App() {
   }
 
   return (
-    <Layout
-      left={
-        <KnowledgeSidebar
-          knowledgePoints={knowledgePoints}
-          onDelete={handleDeletePoint}
-          onConfirmPoint={handleConfirmPoint}
-          onSelectPoint={handleSelectPoint}
-          selectedPointId={selectedPointId}
-          language={language}
+    <>
+      {showApiModal && (
+        <ApiKeyModal
+          mode={modalMode}
+          onComplete={() => setShowApiModal(false)}
+          onClose={() => setShowApiModal(false)}
         />
-      }
-      center={renderCenter()}
-      right={
+      )}
+      <Layout
+        left={
+          <KnowledgeSidebar
+            knowledgePoints={knowledgePoints}
+            onDelete={handleDeletePoint}
+            onConfirmPoint={handleConfirmPoint}
+            onSelectPoint={handleSelectPoint}
+            selectedPointId={selectedPointId}
+            language={language}
+          />
+        }
+        center={renderCenter()}
+        right={
         <div className="sidebar-content">
           <div className="sidebar-header">
             <h3 className="sidebar-title">{uiText.lookUp}</h3>
@@ -688,6 +735,13 @@ function App() {
           >
             {isMuted ? '🔇' : '🔊'}
           </button>
+          <button
+            className="settings-btn"
+            onClick={() => { setModalMode('settings'); setShowApiModal(true) }}
+            title="API Key 设置"
+          >
+            ⚙️
+          </button>
           <div className="language-switcher">
             {LANGUAGES.map((lang) => (
               <button
@@ -703,6 +757,7 @@ function App() {
         </>
       }
     />
+    </>
   )
 }
 

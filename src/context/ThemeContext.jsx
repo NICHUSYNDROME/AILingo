@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { getItem, setItem } from '../utils/storage'
 
 const ThemeContext = createContext(null)
 
 function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
-    // 先检查 localStorage
+    // 同步读取 localStorage 作为初始值（开发环境 + Electron fallback）
     const stored = localStorage.getItem('app_theme')
     if (stored === 'light' || stored === 'dark') {
       return stored
@@ -18,11 +19,24 @@ function ThemeProvider({ children }) {
     return localStorage.getItem('app_theme') !== null
   })
 
-  // 切换主题时存入 localStorage
+  // Electron 环境下，从主进程文件加载真实值（覆盖 localStorage 初始值）
+  useEffect(() => {
+    const loadFromStorage = async () => {
+      const saved = await getItem('app_theme')
+      if (saved === 'light' || saved === 'dark') {
+        setThemeState(saved)
+        setUserSet(true)
+      }
+    }
+    loadFromStorage()
+  }, [])
+
+  // 切换主题时同时写入 localStorage（同步，开发环境）和 storage.js（异步，Electron）
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme)
     setUserSet(true)
     localStorage.setItem('app_theme', newTheme)
+    setItem('app_theme', newTheme) // 异步，不等待
   }, [])
 
   // 监听系统主题变化

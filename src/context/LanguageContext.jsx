@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
+import { getItem, setItem } from '../utils/storage'
 import { UI_TEXT } from '../config/languages'
 
 const STORAGE_KEY = 'app_language'
@@ -15,10 +16,22 @@ export function LanguageProvider({ children }) {
     }
   })
 
+  // Electron 环境下，从主进程文件加载真实值
+  useEffect(() => {
+    const loadFromStorage = async () => {
+      const saved = await getItem(STORAGE_KEY)
+      if (saved === 'ja' || saved === 'en') {
+        setLanguageState(saved)
+      }
+    }
+    loadFromStorage()
+  }, [])
+
   const setLanguage = useCallback((lang) => {
     setLanguageState(lang)
     try {
       localStorage.setItem(STORAGE_KEY, lang)
+      setItem(STORAGE_KEY, lang) // 异步写入 Electron 存储
     } catch {
       // silently ignore
     }

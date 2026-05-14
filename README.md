@@ -71,7 +71,7 @@ AILingo 是一款面向语言学习者的 AI 对话练习工具。它利用 Deep
 
 - Node.js >= 18
 - DeepSeek API Key（[获取](https://platform.deepseek.com/)）
-- （可选）通义千问 DashScope API Key（[获取](https://dashscope.aliyun.com/)）
+- （可选）通义千问 DashScope API Key（[获取](https://bailian.console.aliyun.com/)）
 
 ### 安装与运行
 

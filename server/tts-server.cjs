@@ -11,8 +11,7 @@
 
 const http = require('http')
 
-const PORT = 3001
-
+const PORT = process.env.PORT || 3001
 // === Heartbeat detection ===
 let lastHeartbeat = Date.now()
 const HEARTBEAT_TIMEOUT = 30000 // 30 秒无心跳则自动退出
@@ -122,3 +121,4 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`TTS proxy server running at http://localhost:${PORT}`)
 })
+

@@ -22,3 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.ailingo-pids.json
+
+# Build output
+release/
+*.app
+
+# User data (never commit personal settings)
+*.settings.json
+
+# Backup files
+*.bak
+*.backup
+
+# Duplicate path mistake
+Users/

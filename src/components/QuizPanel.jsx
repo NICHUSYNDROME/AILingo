@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { getApiKey } from '../api'
+import { getItem, removeItem } from '../utils/storage'
 import { calculateNextReview } from '../utils/sm2'
 import { logActivity } from '../utils/learningLog'
 import { getLocalDateString } from '../utils/date'
@@ -251,7 +251,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
     setError(null)
 
     try {
-      const apiKey = getApiKey()
+      const apiKey = await getItem('deepseek_api_key')
       if (!apiKey) {
         setError('Please provide a valid API Key first.')
         setLoading(false)
@@ -296,7 +296,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.removeItem('deepseek_api_key')
+          await removeItem('deepseek_api_key')
           setError('API Key is invalid or expired.')
         } else {
           setError(`Quiz generation failed (${response.status}).`)
@@ -392,7 +392,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
       // If there are subjective questions, ask AI to review
       if (subjectiveQuestions.length > 0) {
-        const apiKey = getApiKey()
+        const apiKey = await getItem('deepseek_api_key')
         if (apiKey) {
           try {
             const response = await fetch('https://api.deepseek.com/chat/completions', {

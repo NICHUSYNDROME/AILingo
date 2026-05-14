@@ -2,7 +2,7 @@
  * TTS (Text-to-Speech) utility module
  *
  * Proxies TTS requests through a local Node.js backend to the Qwen DashScope API.
- * API key is provided by the user on first use and stored in localStorage.
+ * API key is provided by the user on first use and stored persistently.
  * The backend never stores the key.
  *
  * Audio responses are cached in-memory (Map) for the current page session
@@ -12,6 +12,8 @@
  * browser tab is open. If the tab is closed, the backend detects the timeout
  * and shuts itself down automatically.
  */
+
+import { getItem, setItem } from './storage'
 
 const TTS_PROXY_URL = 'http://localhost:3001/tts'
 const PING_URL = 'http://localhost:3001/ping'
@@ -63,31 +65,27 @@ export function isTTSAvailable() {
 /**
  * Speak the given text using Qwen TTS via the local proxy server.
  *
- * On first call without a stored API key, prompts the user to enter one.
- * The key is saved to localStorage for subsequent calls.
- *
+ * The TTS API key must be configured in advance via the settings modal
+ * (ApiKeyModal). If no key is stored, a warning is logged and the call
+ * silently returns without playing audio.
+ * 
  * Audio responses are cached in-memory: repeated calls with the same text
  * reuse the cached audio URL without making a new API request.
  *
  * @param {string} text - The text to read aloud.
  * @param {'en'|'ja'} language - Language code ('en' or 'ja').
- * @param {string|null} apiKey - Optional API key override. If null, reads from localStorage or prompts.
+ * @param {string|null} apiKey - Optional API key override. If null, reads from storage.
  * @returns {Promise<void>}
  */
 export async function speak(text, language = 'en', apiKey = null) {
-  // Resolve API key: param → localStorage → prompt
+  // Resolve API key: param → storage
   if (!apiKey) {
-    apiKey = localStorage.getItem('qwen_tts_api_key')
+    apiKey = await getItem('qwen_tts_api_key')
   }
 
   if (!apiKey) {
-    apiKey = prompt('请输入你的 Qwen TTS (DashScope) API Key：')
-    if (apiKey) {
-      localStorage.setItem('qwen_tts_api_key', apiKey)
-    } else {
-      console.warn('未提供 TTS API Key，无法朗读')
-      return
-    }
+    console.warn('未配置 TTS API Key，请在设置中配置千问 TTS API Key')
+    return
   }
 
   // Voice — qwen3-tts-flash supports: Cherry, Serena, Ethan, Chelsie
