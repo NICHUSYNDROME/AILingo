@@ -1,4 +1,5 @@
 import { Suspense, memo, lazy, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Layout from './components/Layout'
 import ScenarioSetup from './components/ScenarioSetup'
 import KnowledgeSidebar from './components/KnowledgeSidebar'
@@ -16,11 +17,11 @@ const ApiKeyModal = lazy(() => import('./components/ApiKeyModal'))
 // ── Sub-components memoized to prevent cascading re-renders ────────────
 
 const CenterPanel = memo(function CenterPanel(props) {
+  const { t } = useTranslation()
   const {
     centerState,
     conversationKey,
     language,
-    uiText,
     scenario,
     conversationGoal,
     sensitivity,
@@ -47,25 +48,26 @@ const CenterPanel = memo(function CenterPanel(props) {
     updatePointReview,
     handleStartQuiz,
     conversationContextRef,
+    isNarrow,
+    activeTab,
+    setActiveTab,
   } = props
-
-  const [activeTab, setActiveTab] = useState('chat')
 
   switch (centerState) {
     case 'idle':
       return (
         <div className="center-idle">
-          <TabNav
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            dueCount={dueForReviewCount}
-            uiText={uiText}
-          />
+          {!isNarrow && (
+            <TabNav
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              dueCount={dueForReviewCount}
+            />
+          )}
           <div className="idle-content">
-            {activeTab === 'chat' ? (
+            {activeTab === 'chat' && (
               <ScenarioSetup
                 language={language}
-                uiText={uiText}
                 scenario={scenario}
                 conversationGoal={conversationGoal}
                 sensitivity={sensitivity}
@@ -79,14 +81,29 @@ const CenterPanel = memo(function CenterPanel(props) {
                 onStartChat={handleStartChat}
                 generateGoal={handleGenerateGoal}
               />
-            ) : (
+            )}
+            {activeTab === 'review' && (
               <ProgressDashboard
                 language={language}
-                uiText={uiText}
                 getConfirmedCount={getConfirmedCount}
                 dueForReviewCount={dueForReviewCount}
                 onStartQuiz={handleStartQuiz}
               />
+            )}
+            {activeTab === 'knowledge' && (
+              <KnowledgeSidebar
+                knowledgePoints={knowledgePoints}
+                onDelete={props.deletePoint}
+                onConfirmPoint={props.confirmPoint}
+                onSelectPoint={props.handleSelectPoint}
+                selectedPointId={props.selectedPointId}
+                language={language}
+                isNarrow={isNarrow}
+                getPointById={props.getPointById}
+              />
+            )}
+            {activeTab === 'lookup' && (
+              <RightSidebar {...props} isNarrow={isNarrow} />
             )}
           </div>
         </div>
@@ -94,11 +111,11 @@ const CenterPanel = memo(function CenterPanel(props) {
 
     case 'chatting':
       return (
-        <Suspense fallback={<div className="center-loading">{uiText.loadingConversation}</div>}>
+        <Suspense fallback={<div className="center-loading">{t('loadingConversation')}</div>}>
           <ChatArea
             key={conversationKey}
             language={language}
-            uiText={uiText}
+            isNarrow={isNarrow}
             isChatStarted={true}
             conversationContextRef={conversationContextRef}
             onSidebarUpdate={handleSidebarUpdate}
@@ -116,10 +133,9 @@ const CenterPanel = memo(function CenterPanel(props) {
 
     case 'quiz':
       return (
-        <Suspense fallback={<div className="center-loading">{uiText.loadingQuiz}</div>}>
+        <Suspense fallback={<div className="center-loading">{t('loadingQuiz')}</div>}>
           <QuizPanel
             language={language}
-            uiText={uiText}
             knowledgePoints={knowledgePoints}
             getPointById={getPointById}
             updatePointReview={updatePointReview}
@@ -134,8 +150,8 @@ const CenterPanel = memo(function CenterPanel(props) {
 })
 
 const RightSidebar = memo(function RightSidebar(props) {
+  const { t } = useTranslation()
   const {
-    uiText,
     sidebarContent,
     sidebarContentType,
     dictQuery,
@@ -149,6 +165,9 @@ const RightSidebar = memo(function RightSidebar(props) {
     handleSidebarClose,
     setExpandedChinese,
     language,
+    isNarrow,
+    confirmPoint,
+    deletePoint,
   } = props
 
   const sidebarPoint = selectedPointId ? getPointById(selectedPointId) || sidebarContent : sidebarContent
@@ -156,7 +175,7 @@ const RightSidebar = memo(function RightSidebar(props) {
   return (
     <div className="sidebar-content">
       <div className="sidebar-header">
-        <h3 className="sidebar-title">{uiText.lookUp}</h3>
+        <h3 className="sidebar-title">{t('lookUp')}</h3>
         {sidebarContent && (
           <button className="sidebar-close-btn" onClick={handleSidebarClose}>
             ×
@@ -167,7 +186,7 @@ const RightSidebar = memo(function RightSidebar(props) {
         <input
           className="sidebar-dict-input"
           type="text"
-          placeholder={uiText.dictPlaceholder}
+          placeholder={t('dictPlaceholder')}
           value={dictQuery}
           onChange={(e) => setDictQuery(e.target.value)}
           onKeyDown={handleDictKeyDown}
@@ -177,7 +196,7 @@ const RightSidebar = memo(function RightSidebar(props) {
           onClick={handleDictSearch}
           disabled={dictLoading || !dictQuery.trim()}
         >
-          {dictLoading ? uiText.dictLoading : uiText.search}
+          {dictLoading ? t('dictLoading') : t('search')}
         </button>
       </div>
       {sidebarContentType === 'point' ? (
@@ -186,7 +205,9 @@ const RightSidebar = memo(function RightSidebar(props) {
           expandedChinese={expandedChinese}
           onToggleChinese={() => setExpandedChinese((prev) => !prev)}
           language={language}
-          uiText={uiText}
+          isNarrow={isNarrow}
+          onConfirmPoint={confirmPoint}
+          onDeletePoint={deletePoint}
         />
       ) : sidebarContent?.error ? (
         <div className="sidebar-detail" style={{ color: '#ff4d4f' }}>
@@ -205,7 +226,9 @@ const RightSidebar = memo(function RightSidebar(props) {
           expandedChinese={expandedChinese}
           onToggleChinese={() => setExpandedChinese((prev) => !prev)}
           language={language}
-          uiText={uiText}
+          isNarrow={isNarrow}
+          onConfirmPoint={confirmPoint}
+          onDeletePoint={deletePoint}
         />
       )}
     </div>
@@ -226,17 +249,43 @@ function AppView(props) {
     selectedPointId,
     language,
     setLanguage,
-    uiText,
     theme,
     followSystem,
     setFollowSystem,
     setTheme,
     isMuted,
     setIsMuted,
+    isNarrow,
+    centerState,
+    dueForReviewCount,
   } = props
 
+  const showTopToggles = isNarrow && centerState !== 'idle'
+
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [leftOpen, setLeftOpen] = useState(false)
+  const [rightOpen, setRightOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('chat')
   const autoReadAloud = !isMuted
+
+  const handleLeftToggle = () => {
+    setLeftOpen((v) => !v)
+    setRightOpen(false)
+  }
+  const handleRightToggle = () => {
+    setRightOpen((v) => !v)
+    setLeftOpen(false)
+  }
+
+  // Narrow idle: build TabNav for topbar
+  const narrowTabNav = isNarrow && centerState === 'idle' ? (
+    <TabNav
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      dueCount={dueForReviewCount}
+      isNarrow={true}
+    />
+  ) : null
 
   return (
     <>
@@ -258,19 +307,26 @@ function AppView(props) {
             onSelectPoint={handleSelectPoint}
             selectedPointId={selectedPointId}
             language={language}
-            uiText={uiText}
+            isNarrow={isNarrow}
+            getPointById={props.getPointById}
           />
         }
-        center={<CenterPanel {...props} />}
-        right={<RightSidebar {...props} />}
+        center={<CenterPanel {...props} isNarrow={isNarrow} activeTab={activeTab} setActiveTab={setActiveTab} />}
+        right={<RightSidebar {...props} isNarrow={isNarrow} />}
         onHamburgerClick={() => setSettingsOpen(true)}
+        isNarrow={isNarrow}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        onLeftToggle={handleLeftToggle}
+        onRightToggle={handleRightToggle}
+        showTopToggles={showTopToggles}
+        topbarRight={narrowTabNav}
         settingsPanel={
           <SettingsPanel
             open={settingsOpen}
             onClose={() => setSettingsOpen(false)}
             language={language}
             setLanguage={setLanguage}
-            uiText={uiText}
             theme={theme}
             followSystem={followSystem}
             setFollowSystem={setFollowSystem}

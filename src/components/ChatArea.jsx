@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { debug } from '../utils/debug'
 import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
 import {
@@ -234,7 +235,8 @@ const generateAnnotatedMessage = (originalText, annotations) => {
   }
 }
 
-function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], uiText }) {
+function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow }) {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -245,6 +247,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   const [summaryError, setSummaryError] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showBackConfirm, setShowBackConfirm] = useState(false)
+  const [showSysInfo, setShowSysInfo] = useState(false)
   const [speakingMsgId, setSpeakingMsgId] = useState(null)
   const playingMsgIdRef = useRef(null)
   const listRef = useRef(null)
@@ -358,7 +361,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       const doAiStart = async () => {
         const reply = await sendToAI(
-          uiText.aiStartPrompt,
+          t('aiStartPrompt'),
           [],
           ctx,
           false,
@@ -496,7 +499,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     } catch {
       const fallbackMessage = {
         role: 'summary',
-        content: uiText.conversationEnded,
+        content: t('conversationEnded'),
       }
       setMessages((prev) => [...prev, fallbackMessage])
       setSummaryError(true)
@@ -1096,37 +1099,69 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         </div>
       )}
 
-      <div className="chat-header-row">
-        <div className="chat-header-left">
-          {!summaryDone && !summaryLoading && (
-            <button className="chat-back-btn" onClick={() => setShowBackConfirm(true)} title={uiText.backToHomeTooltip}>{uiText.quizBack}</button>
-          )}
+      <div className={`chat-header-row ${isNarrow ? 'chat-header-narrow' : ''}`}>
+        {/* ── Back button (always on left) ── */}
+        {!summaryDone && !summaryLoading && (
+          <button className="chat-back-btn" onClick={() => setShowBackConfirm(true)} title={t('backToHomeTooltip')}>{t('quizBack')}</button>
+        )}
+
+        {/* ── TODO list (center, always visible) ── */}
+        {todos.length > 0 && (
+          <div className={`chat-todo-list ${isNarrow ? 'chat-todo-wide' : ''}`}>
+            <div className="chat-todo-title">TODO</div>
+            <div className="chat-todo-items">
+              {todos.map((t) => (
+                <div key={t.id} className={`chat-todo-item ${t.completed ? 'completed' : ''}`}>
+                  <span className="chat-todo-checkbox">{t.completed ? '☑' : '☐'}</span>
+                  <span className="chat-todo-text">{t.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Scenario info (right) ── */}
+        {!isNarrow && (
           <div className="chat-system-msg">
             {(() => {
               const info = getSystemMessage()
-              if (!info) return ''
+              if (!info) return null
               return (
                 <>
-                  <span className="scenario-name">📋 Scenario: {info.scenarioName}</span>
-                  <br />
-                  <span className="detail-line">Sensitivity: {info.sensitivity}</span>
-                  <br />
-                  <span className="detail-line">Max Rounds: {info.maxRounds} | Target Knowledge Points: {info.targetKnowledge}</span>
+                  <div className="scenario-name">📋 {info.scenarioName}</div>
+                  <div className="detail-line">Sensitivity: {info.sensitivity}</div>
+                  <div className="detail-line">Max Rounds: {info.maxRounds}</div>
+                  <div className="detail-line">Target Knowledge: {info.targetKnowledge}</div>
                 </>
               )
             })()}
           </div>
-        </div>
-        {todos.length > 0 && (
-          <div className="chat-todo-list">
-            <div className="chat-todo-title">TODO</div>
-            {todos.map((t) => (
-              <div key={t.id} className={`chat-todo-item ${t.completed ? 'completed' : ''}`}>
-                <span className="chat-todo-checkbox">{t.completed ? '☑' : '☐'}</span>
-                <span className="chat-todo-text">{t.text}</span>
-              </div>
-            ))}
-          </div>
+        )}
+        {isNarrow && (
+          <>
+            <button className="chat-sysinfo-btn" onClick={() => setShowSysInfo((v) => !v)} title="Scenario info">
+              📋
+            </button>
+            {showSysInfo && (
+              <>
+                <div className="chat-sysinfo-backdrop" onClick={() => setShowSysInfo(false)} />
+                <div className="chat-sysinfo-popup">
+                  {(() => {
+                    const info = getSystemMessage()
+                    if (!info) return null
+                    return (
+                      <>
+                        <div className="chat-sysinfo-row"><strong>Scenario:</strong> {info.scenarioName}</div>
+                        <div className="chat-sysinfo-row"><strong>Sensitivity:</strong> {info.sensitivity}</div>
+                        <div className="chat-sysinfo-row"><strong>Max Rounds:</strong> {info.maxRounds}</div>
+                        <div className="chat-sysinfo-row"><strong>Target Knowledge:</strong> {info.targetKnowledge}</div>
+                      </>
+                    )
+                  })()}
+                </div>
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -1203,7 +1238,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                         setSpeakingMsgId(null)
                       }
                     }
-                  }} title={uiText.readAloud}>{speakingMsgId === i ? '⏳' : '🔊'}</button>
+                  }} title={t('readAloud')}>{speakingMsgId === i ? '⏳' : '🔊'}</button>
                 )}
               </div>
 
@@ -1321,7 +1356,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       {summaryDone && (
         <div className="chat-end-bar">
-          <button className="chat-new-btn" onClick={handleNewConversation}>{uiText.backToHome}</button>
+          <button className="chat-new-btn" onClick={handleNewConversation}>{t('backToHome')}</button>
         </div>
       )}
     </div>

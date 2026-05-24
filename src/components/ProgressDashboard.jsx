@@ -1,14 +1,15 @@
 import { useMemo, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import HeatmapCalendar from './HeatmapCalendar'
 import { getWeeklyStats } from '../utils/learningLog'
 
 const ProgressDashboard = memo(function ProgressDashboard({
   language,
-  uiText,
   getConfirmedCount,
   dueForReviewCount,
   onStartQuiz,
 }) {
+  const { t } = useTranslation()
   const weeklyStats = useMemo(() => getWeeklyStats(language), [language])
 
   const confirmedCount = useMemo(() => {
@@ -20,12 +21,12 @@ const ProgressDashboard = memo(function ProgressDashboard({
 
   return (
     <div className="progress-dashboard">
-      <h3 className="progress-title">{uiText.learningProgress}</h3>
+      <h3 className="progress-title">{t('learningProgress')}</h3>
 
       <div className="progress-body">
         {/* Left column: Heatmap Calendar */}
         <div className="progress-left">
-          <HeatmapCalendar language={language} uiText={uiText} />
+          <HeatmapCalendar language={language} />
         </div>
 
         {/* Divider */}
@@ -37,15 +38,15 @@ const ProgressDashboard = memo(function ProgressDashboard({
             <div className="progress-stats">
               <div className="progress-stat-item">
                 <span className="progress-stat-value">{weeklyStats.conversation}</span>
-                <span className="progress-stat-label">{uiText.conversationsThisWeek}</span>
+                <span className="progress-stat-label">{t('conversationsThisWeek')}</span>
               </div>
               <div className="progress-stat-item">
                 <span className="progress-stat-value">{confirmedCount}</span>
-                <span className="progress-stat-label">{uiText.confirmedPoints}</span>
+                <span className="progress-stat-label">{t('confirmedPoints')}</span>
               </div>
               <div className="progress-stat-item">
                 <span className="progress-stat-value">{dueForReviewCount}</span>
-                <span className="progress-stat-label">{uiText.dueForReview}</span>
+                <span className="progress-stat-label">{t('dueForReview')}</span>
               </div>
             </div>
 
@@ -55,11 +56,11 @@ const ProgressDashboard = memo(function ProgressDashboard({
               disabled={!hasDueForReview}
               title={
                 hasDueForReview
-                  ? uiText.startQuiz
-                  : uiText.noDueForReviewTitle
+                  ? t('startQuiz')
+                  : t('noDueForReviewTitle')
               }
             >
-              {hasDueForReview ? `📝 ${uiText.startQuiz}` : uiText.noDueForReviewLabel}
+              {hasDueForReview ? `📝 ${t('startQuiz')}` : t('noDueForReviewLabel')}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getMonthlyData, getDayScore } from '../utils/learningLog'
 
 const MONTH_NAMES = [
@@ -20,7 +21,8 @@ function getColor(score) {
   return 'var(--heatmap-level4)'
 }
 
-function HeatmapCalendar({ language = 'en', uiText }) {
+function HeatmapCalendar({ language = 'en' }) {
+  const { t } = useTranslation()
   const now = new Date()
   const [currentYear, setCurrentYear] = useState(now.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1) // 1-12
@@ -143,7 +145,7 @@ function HeatmapCalendar({ language = 'en', uiText }) {
                 ...CELL_STYLE,
                 backgroundColor: getColor(cell.score),
               }}
-              title={`${cell.key}: ${cell.score} ${uiText.heatmapActivities}`}
+              title={`${cell.key}: ${cell.score} ${t('heatmapActivities')}`}
             />
           )
         })}
@@ -151,13 +153,13 @@ function HeatmapCalendar({ language = 'en', uiText }) {
 
       {/* Legend */}
       <div className="heatmap-legend" style={{ height: 16, maxHeight: 16 }}>
-        <span className="heatmap-legend-label" style={{ fontSize: 8, lineHeight: 1 }}>{uiText.heatmapLess}</span>
+        <span className="heatmap-legend-label" style={{ fontSize: 8, lineHeight: 1 }}>{t('heatmapLess')}</span>
         <span className="heatmap-legend-swatch" style={{ width: 8, height: 8, minWidth: 8, minHeight: 8, backgroundColor: 'var(--heatmap-empty)', flexShrink: 0, flexGrow: 0 }} />
         <span className="heatmap-legend-swatch" style={{ width: 8, height: 8, minWidth: 8, minHeight: 8, backgroundColor: 'var(--heatmap-level1)', flexShrink: 0, flexGrow: 0 }} />
         <span className="heatmap-legend-swatch" style={{ width: 8, height: 8, minWidth: 8, minHeight: 8, backgroundColor: 'var(--heatmap-level2)', flexShrink: 0, flexGrow: 0 }} />
         <span className="heatmap-legend-swatch" style={{ width: 8, height: 8, minWidth: 8, minHeight: 8, backgroundColor: 'var(--heatmap-level3)', flexShrink: 0, flexGrow: 0 }} />
         <span className="heatmap-legend-swatch" style={{ width: 8, height: 8, minWidth: 8, minHeight: 8, backgroundColor: 'var(--heatmap-level4)', flexShrink: 0, flexGrow: 0 }} />
-        <span className="heatmap-legend-label" style={{ fontSize: 8, lineHeight: 1 }}>{uiText.heatmapMore}</span>
+        <span className="heatmap-legend-label" style={{ fontSize: 8, lineHeight: 1 }}>{t('heatmapMore')}</span>
       </div>
     </div>
   )

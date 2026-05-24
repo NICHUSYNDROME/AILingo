@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback, useEffect, memo } from 'react'
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
 import './ScenarioSetup.css'
 
 const ScenarioSetup = memo(function ScenarioSetup({
   language,
-  uiText,
   scenario,
   conversationGoal,
   sensitivity,
@@ -18,6 +18,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
   onStartChat,
   generateGoal,
 }) {
+  const { t } = useTranslation()
   const [showConfirm, setShowConfirm] = useState(false)
   const [confirmError, setConfirmError] = useState('')
   const [goalLoading, setGoalLoading] = useState(false)
@@ -30,20 +31,25 @@ const ScenarioSetup = memo(function ScenarioSetup({
   const currentScenarios = SCENARIOS[language] || SCENARIOS.en
   const currentSensitivityLabels = SENSITIVITY_LABELS[language] || SENSITIVITY_LABELS.en
 
-  // Helper: adjust textarea height based on content
-  const adjustTextareaHeight = useCallback(() => {
+  // Auto-resize textarea to fit content (runs before paint, every render)
+  useLayoutEffect(() => {
     const ta = goalTextareaRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    const newHeight = Math.min(ta.scrollHeight, 100)
-    ta.style.height = newHeight + 'px'
-    ta.style.overflowY = ta.scrollHeight > 100 ? 'auto' : 'hidden'
-  }, [])
+    ta.style.height = ta.scrollHeight + 'px'
+  })
 
-  // Auto-resize whenever conversationGoal changes (typing, random gen, etc.)
+  // Re-measure on window resize (media query changes affect text wrapping)
   useEffect(() => {
-    adjustTextareaHeight()
-  }, [conversationGoal, adjustTextareaHeight])
+    const handleResize = () => {
+      const ta = goalTextareaRef.current
+      if (!ta) return
+      ta.style.height = 'auto'
+      ta.style.height = ta.scrollHeight + 'px'
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Auto-resize the goal textarea based on content
   const handleGoalInput = useCallback((e) => {
@@ -86,7 +92,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
     // Validate custom scenario
     if (isCustom && !customScenario.trim()) {
-      setConfirmError(uiText.validationCustomScenario)
+      setConfirmError(t('validationCustomScenario'))
       return
     }
 
@@ -110,12 +116,12 @@ const ScenarioSetup = memo(function ScenarioSetup({
   const handleConfirm = () => {
     // Validate: goal must not be empty
     if (!conversationGoal?.trim()) {
-      setConfirmError(uiText.validationGoal)
+      setConfirmError(t('validationGoal'))
       return
     }
     // Validate: if effective values are blank (shouldn't happen but safety check)
     if (!effectiveMaxRounds || !effectiveTargetKnowledge) {
-      setConfirmError(uiText.validationMaxRounds)
+      setConfirmError(t('validationMaxRounds'))
       return
     }
     setShowConfirm(false)
@@ -147,12 +153,12 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
   return (
     <div className="scenario-setup">
-      <h2 className="scenario-title">{uiText.scenarioSetup}</h2>
+      <h2 className="scenario-title">{t('scenarioSetup')}</h2>
 
       <div className="scenario-fields-wrapper">
         {/* 场景选择 */}
         <div className="scenario-field">
-          <label className="scenario-label">{uiText.scenario}</label>
+          <label className="scenario-label">{t('scenario')}</label>
           <select
             className="scenario-select"
             value={scenario}
@@ -170,13 +176,13 @@ const ScenarioSetup = memo(function ScenarioSetup({
         {isCustom && (
           <div className="scenario-field">
             <label className="scenario-label">
-              {uiText.customScenarioLabel}
+              {t('customScenarioLabel')}
             </label>
             <input
               ref={customInputRef}
               type="text"
               className="scenario-input custom-scenario-input"
-              placeholder={uiText.customScenarioPlaceholder}
+              placeholder={t('customScenarioPlaceholder')}
               value={customScenario}
               onChange={(e) => setCustomScenario(e.target.value)}
             />
@@ -185,30 +191,29 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
         {/* 对话目标 — textarea + 随机按钮 */}
         <div className="scenario-field">
-          <label className="scenario-label">{uiText.conversationGoal}</label>
+          <label className="scenario-label">{t('conversationGoal')}</label>
           <div className="goal-input-row">
             <textarea
               ref={goalTextareaRef}
               className="scenario-input goal-input goal-textarea"
-              placeholder={uiText.goalPlaceholder}
+              placeholder={t('goalPlaceholder')}
               value={conversationGoal}
               onChange={handleGoalInput}
-              rows={1}
             />
             <button
               className="goal-random-btn"
               onClick={handleRandomGoal}
               disabled={goalLoading}
-              title={uiText.random}
+              title={t('random')}
             >
-              {goalLoading ? '...' : `🎲 ${uiText.random}`}
+              {goalLoading ? '...' : `🎲 ${t('random')}`}
             </button>
           </div>
         </div>
 
         {/* 纠错敏感度 */}
         <div className="scenario-field">
-          <label className="scenario-label">{uiText.sensitivity}</label>
+          <label className="scenario-label">{t('sensitivity')}</label>
           <div className="sensitivity-group">
             {['loose', 'normal', 'strict'].map((key) => (
               <button
@@ -224,7 +229,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
         {/* 最大轮次 */}
         <div className="scenario-field">
-          <label className="scenario-label">{uiText.maxRounds}</label>
+          <label className="scenario-label">{t('maxRounds')}</label>
           <input
             type="text"
             inputMode="numeric"
@@ -243,7 +248,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
         {/* 目标知识点数 */}
         <div className="scenario-field">
-          <label className="scenario-label">{uiText.targetKnowledge}</label>
+          <label className="scenario-label">{t('targetKnowledge')}</label>
           <input
             type="text"
             inputMode="numeric"
@@ -262,7 +267,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
         {/* 开始对话按钮 */}
         <button className="start-btn" onClick={handleStartClick}>
-          {uiText.startChat}
+          {t('startChat')}
         </button>
       </div>
 
@@ -270,29 +275,29 @@ const ScenarioSetup = memo(function ScenarioSetup({
         <div className="confirm-overlay" onClick={handleCancel}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3 className="confirm-title">
-              {uiText.confirmTitle}
+              {t('confirmTitle')}
             </h3>
             <div className="confirm-body">
               <div className="confirm-item">
-                <span className="confirm-label">{uiText.scenario}</span>
+                <span className="confirm-label">{t('scenario')}</span>
                 <span className="confirm-value">{isCustom ? customScenario : (currentScenarios.find((s) => s.value === scenario)?.label || scenario)}</span>
               </div>
               <div className="confirm-item">
-                <span className="confirm-label">{uiText.conversationGoal}</span>
+                <span className="confirm-label">{t('conversationGoal')}</span>
                 <span className="confirm-value confirm-goal-text">
-                  {conversationGoal || (goalLoading ? uiText.confirmGeneratingGoal : uiText.confirmUnfilled)}
+                  {conversationGoal || (goalLoading ? t('confirmGeneratingGoal') : t('confirmUnfilled'))}
                 </span>
               </div>
               <div className="confirm-item">
-                <span className="confirm-label">{uiText.sensitivity}</span>
+                <span className="confirm-label">{t('sensitivity')}</span>
                 <span className="confirm-value">{currentSensitivityLabels[sensitivity] || sensitivity}</span>
               </div>
               <div className="confirm-item">
-                <span className="confirm-label">{uiText.maxRounds}</span>
+                <span className="confirm-label">{t('maxRounds')}</span>
                 <span className="confirm-value">{effectiveMaxRounds}</span>
               </div>
               <div className="confirm-item">
-                <span className="confirm-label">{uiText.targetKnowledge}</span>
+                <span className="confirm-label">{t('targetKnowledge')}</span>
                 <span className="confirm-value">{effectiveTargetKnowledge}</span>
               </div>
             </div>
@@ -301,10 +306,10 @@ const ScenarioSetup = memo(function ScenarioSetup({
             )}
             <div className="confirm-actions">
               <button className="confirm-cancel-btn" onClick={handleCancel}>
-                {uiText.confirmCancel}
+                {t('confirmCancel')}
               </button>
               <button className="confirm-ok-btn" onClick={handleConfirm}>
-                {uiText.confirmOk}
+                {t('confirmOk')}
               </button>
             </div>
           </div>

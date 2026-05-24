@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LANGUAGES } from '../config/languages'
 import './SettingsPanel.css'
 
@@ -13,8 +14,8 @@ const SettingsPanel = memo(function SettingsPanel({
   setTheme,
   autoReadAloud,
   setAutoReadAloud,
-  uiText,
 }) {
+  const { t } = useTranslation()
   if (!open) return null
 
   return (
@@ -25,7 +26,7 @@ const SettingsPanel = memo(function SettingsPanel({
       {/* Panel */}
       <div className={`settings-panel ${open ? 'settings-panel-open' : ''}`}>
         <div className="settings-panel-header">
-          <h3 className="settings-panel-title">{uiText.settings}</h3>
+          <h3 className="settings-panel-title">{t('settings')}</h3>
           <button className="settings-panel-close" onClick={onClose}>
             ✕
           </button>
@@ -34,7 +35,7 @@ const SettingsPanel = memo(function SettingsPanel({
         <div className="settings-panel-body">
           {/* Language */}
           <div className="settings-group">
-            <label className="settings-label">{uiText.settingsLanguage}</label>
+            <label className="settings-label">{t('settingsLanguage')}</label>
             <select
               className="settings-select"
               value={language}
@@ -50,10 +51,10 @@ const SettingsPanel = memo(function SettingsPanel({
 
           {/* Theme */}
           <div className="settings-group">
-            <label className="settings-label">{uiText.settingsTheme}</label>
+            <label className="settings-label">{t('settingsTheme')}</label>
 
             <div className="settings-toggle-row">
-              <span className="settings-toggle-label">{uiText.settingsFollowSystem}</span>
+              <span className="settings-toggle-label">{t('settingsFollowSystem')}</span>
               <button
                 className={`settings-toggle ${followSystem ? 'settings-toggle-on' : ''}`}
                 onClick={() => setFollowSystem(!followSystem)}
@@ -66,7 +67,7 @@ const SettingsPanel = memo(function SettingsPanel({
 
             <div className="settings-toggle-row">
               <span className={`settings-toggle-label ${followSystem ? 'settings-toggle-disabled' : ''}`}>
-                {uiText.settingsDarkMode}
+                {t('settingsDarkMode')}
               </span>
               <button
                 className={`settings-toggle ${!followSystem && theme === 'dark' ? 'settings-toggle-on' : ''}`}
@@ -86,10 +87,10 @@ const SettingsPanel = memo(function SettingsPanel({
 
           {/* Auto-read AI replies */}
           <div className="settings-group">
-            <label className="settings-label">{uiText.settingsAutoRead}</label>
+            <label className="settings-label">{t('settingsAutoRead')}</label>
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">
-                {autoReadAloud ? uiText.on : uiText.off}
+                {autoReadAloud ? t('on') : t('off')}
               </span>
               <button
                 className={`settings-toggle ${autoReadAloud ? 'settings-toggle-on' : ''}`}

@@ -1,13 +1,15 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import './TabNav.css'
 
-const TabNav = memo(function TabNav({ activeTab, onTabChange, dueCount, uiText }) {
+const TabNav = memo(function TabNav({ activeTab, onTabChange, dueCount, isNarrow, onToggleLeft, onToggleRight }) {
+  const { t } = useTranslation()
   return (
     <nav className="tab-nav">
       <button
         className={`tab-nav-btn ${activeTab === 'chat' ? 'tab-nav-active' : ''}`}
         onClick={() => onTabChange('chat')}
-        title={uiText.scenarioSetup}
+        title={t('scenarioSetup')}
       >
         💬
       </button>
@@ -15,7 +17,7 @@ const TabNav = memo(function TabNav({ activeTab, onTabChange, dueCount, uiText }
       <button
         className={`tab-nav-btn ${activeTab === 'review' ? 'tab-nav-active' : ''}`}
         onClick={() => onTabChange('review')}
-        title={uiText.learningProgress}
+        title={t('learningProgress')}
       >
         <span className="tab-nav-icon-wrap">
           📊
@@ -24,6 +26,26 @@ const TabNav = memo(function TabNav({ activeTab, onTabChange, dueCount, uiText }
           )}
         </span>
       </button>
+
+      {/* Narrow-mode extra tabs: Knowledge & LookUp panels */}
+      {isNarrow && (
+        <>
+          <button
+            className={`tab-nav-btn tab-nav-extra ${activeTab === 'knowledge' ? 'tab-nav-active' : ''}`}
+            onClick={() => onTabChange('knowledge')}
+            title={t('knowledgePoints')}
+          >
+            📚
+          </button>
+          <button
+            className={`tab-nav-btn tab-nav-extra ${activeTab === 'lookup' ? 'tab-nav-active' : ''}`}
+            onClick={() => onTabChange('lookup')}
+            title={t('lookUp')}
+          >
+            📖
+          </button>
+        </>
+      )}
     </nav>
   )
 })

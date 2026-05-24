@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import './KnowledgeSidebar.css'
 import { TYPE_CONFIG, JA_TYPE_CONFIG } from '../config/languages'
+import LookUpPanel from './LookUpPanel'
 
 const KnowledgeSidebar = memo(function KnowledgeSidebar({
   knowledgePoints,
@@ -9,12 +11,16 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   onSelectPoint,
   selectedPointId,
   language = 'en',
-  uiText,
+  isNarrow,
+  getPointById,
 }) {
+  const { t } = useTranslation()
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
   const [searchQuery, setSearchQuery] = useState('')
   const [sortMethod, setSortMethod] = useState('recent')
   const [newPointIds, setNewPointIds] = useState(new Set())
+  const [expandedPointId, setExpandedPointId] = useState(null)  // narrow-mode inline detail
+  const [expandedChinese, setExpandedChinese] = useState(false)
   const listRef = useRef(null)
   const prevCountRef = useRef(knowledgePoints.length)
 
@@ -112,28 +118,39 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
 
   const handleSelectPoint = useCallback(
     (id) => {
-      onSelectPoint(id)
+      if (isNarrow) {
+        // Toggle inline detail expansion
+        setExpandedPointId((prev) => (prev === id ? null : id))
+        setExpandedChinese(false)
+      } else {
+        onSelectPoint(id)
+      }
     },
-    [onSelectPoint]
+    [onSelectPoint, isNarrow]
   )
 
+  const handleCloseInlineDetail = useCallback((e) => {
+    e.stopPropagation()
+    setExpandedPointId(null)
+  }, [])
+
   const sortButtons = [
-    { key: 'alphabet', label: uiText.sortAlphabet },
-    { key: 'difficulty', label: uiText.sortDifficulty },
-    { key: 'recent', label: uiText.sortRecent },
-    { key: 'mastery', label: uiText.sortMastery },
+    { key: 'alphabet', label: t('sortAlphabet') },
+    { key: 'difficulty', label: t('sortDifficulty') },
+    { key: 'recent', label: t('sortRecent') },
+    { key: 'mastery', label: t('sortMastery') },
   ]
 
   return (
     <div className="kp-sidebar">
-      <h3 className="kp-sidebar-title">{uiText.knowledgePoints}</h3>
+      <h3 className="kp-sidebar-title">{t('knowledgePoints')}</h3>
 
       {/* Search bar */}
       <div className="kp-search-bar">
         <input
           className="kp-search-input"
           type="text"
-          placeholder={uiText.searchPlaceholder}
+          placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -157,8 +174,8 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
         {displayPoints.length === 0 ? (
           <p className="kp-empty">
             {searchQuery.trim()
-              ? uiText.noMatchingPoints
-              : uiText.noPoints}
+              ? t('noMatchingPoints')
+              : t('noPoints')}
           </p>
         ) : (
           displayPoints.map((point) => {
@@ -179,7 +196,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                   {/* Status dot */}
                   <span
                     className={`kp-status-dot ${isConfirmed ? 'kp-dot-confirmed' : 'kp-dot-unconfirmed'}`}
-                    title={isConfirmed ? uiText.confirmed : uiText.pendingConfirmation}
+                    title={isConfirmed ? t('confirmed') : t('pendingConfirmation')}
                   />
 
                   {/* Type tag */}
@@ -205,7 +222,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                           ? point.meaning.slice(0, 50) + '...'
                           : point.meaning)
                         : (point.type === 'grammar'
-                          ? (point.meaningChinese || uiText.grammarRule)
+                          ? (point.meaningChinese || t('grammarRule'))
                           : '')}
                     </span>
                   </div>
@@ -216,20 +233,32 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                       <button
                         className="kp-action-btn kp-keep-btn"
                         onClick={(e) => handleKeepClick(e, point.id)}
-                        title={uiText.keepTooltip}
+                        title={t('keepTooltip')}
                       >
-                        {uiText.keep}
+                        {t('keep')}
                       </button>
                     )}
                     <button
                       className="kp-action-btn kp-discard-btn"
                       onClick={(e) => handleDeleteClick(e, point.id)}
-                      title={uiText.discardTooltip}
+                      title={t('discardTooltip')}
                     >
-                      {uiText.discard}
+                      {t('discard')}
                     </button>
                   </div>
                 </div>
+                {/* Narrow-mode inline detail */}
+                {isNarrow && expandedPointId === point.id && (
+                  <div className="kp-inline-detail">
+                    <button className="kp-inline-close" onClick={handleCloseInlineDetail}>✕</button>
+                    <LookUpPanel
+                      point={point}
+                      expandedChinese={expandedChinese}
+                      onToggleChinese={() => setExpandedChinese((prev) => !prev)}
+                      language={language}
+                    />
+                  </div>
+                )}
               </div>
             )
           })

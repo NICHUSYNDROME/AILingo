@@ -11,11 +11,13 @@ import { useTheme } from './context/ThemeContext'
 import { SCENARIOS } from './config/languages'
 import { getDictSystemPrompt } from './config/prompts'
 import { getLocalDateString } from './utils/date'
+import { useResponsive } from './hooks/useResponsive'
 import './App.css'
 
 function App() {
-  const { language, setLanguage, uiText } = useLanguage()
+  const { language, setLanguage } = useLanguage()
   const { theme, setTheme, followSystem, setFollowSystem } = useTheme()
+  const isNarrow = useResponsive(900)
 
   // === API Key modal state ===
   const [showApiModal, setShowApiModal] = useState(false)
@@ -151,7 +153,6 @@ function App() {
     <AppView
       language={language}
       setLanguage={setLanguage}
-      uiText={uiText}
       theme={theme}
       setTheme={setTheme}
       followSystem={followSystem}
@@ -162,6 +163,7 @@ function App() {
       setModalMode={setModalMode}
       isMuted={isMuted}
       setIsMuted={setIsMuted}
+      isNarrow={isNarrow}
       centerState={centerState}
       scenario={scenario}
       setScenario={setScenario}
