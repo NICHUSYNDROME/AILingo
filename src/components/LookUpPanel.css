@@ -76,8 +76,36 @@
   font-size: 14px;
   color: var(--text-tertiary);
   line-height: 1.4;
-  margin-bottom: 10px;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.lup-phonetic-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.lup-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  background: none;
+  border: none;
+  transition: transform 0.1s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.lup-speak-btn:hover {
+  transform: scale(1.2);
+}
+
+.lup-speak-btn:active {
+  transform: scale(0.95);
 }
 
 .lup-type-tag {

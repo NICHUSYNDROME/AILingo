@@ -48,6 +48,7 @@
   "lookUpTipType": "または上の検索ボックスに単語やフレーズを入力",
   "lookUpTipConfirm": "修正から単語を確認して単語帳を作成",
   "lookUpTipReview": "確認済み単語をクイズで復習",
+  "speakWord": "この単語を読み上げる",
   "learningProgress": "学習の進捗",
   "conversationsThisWeek": "今週の会話数",
   "confirmedPoints": "確認済み単語",

@@ -17,10 +17,11 @@ function getBestVoice(lang) {
 
   const langPrefix = lang === 'ja' ? 'ja-JP' : 'en-US'
 
-  // Priority order for English: Google > Apple > Microsoft > any en-US
+  // For Japanese: prefer native voices (Kyoko, Otoya)
+  // For English: try clear male US voices, fallback to natural voices
   const priorityPatterns = lang === 'ja'
-    ? ['Google', 'ja-JP']
-    : ['Google US English', 'Samantha', 'Microsoft Zira', 'en-US']
+    ? ['Kyoko', 'Otoya', 'Google', 'ja-JP']
+    : ['Daniel', 'Samantha', 'Kathy', 'en-US']
 
   for (const pattern of priorityPatterns) {
     const match = voices.find(v => v.name.includes(pattern) || v.lang === pattern)
@@ -48,44 +49,56 @@ export function stopSpeaking() {
 }
 
 /**
- * Speak a word/phrase using the browser's built-in speech synthesis.
- * @param {string} text - The text to speak
- * @param {string} language - 'en' or 'ja'
- * @returns {Promise<void>} Resolves when speech completes
+ * Speak a word/phrase.
+ * English: uses Youdao public dictvoice API (native speaker recordings).
+ * Japanese / fallback: uses browser's Web Speech API.
  */
+
+const audioCache = new Map()
+
 export function speakWord(text, language = 'en') {
-  return new Promise((resolve, reject) => {
-    if (!text || text.trim() === '') {
-      resolve()
-      return
+  return new Promise((resolve) => {
+    if (!text || text.trim() === '') { resolve(); return }
+
+    // Build Youdao dictvoice URL
+    const params = language === 'ja'
+      ? `le=jap&type=3&audio=${encodeURIComponent(text)}`
+      : `type=1&audio=${encodeURIComponent(text)}`
+    const url = `http://dict.youdao.com/dictvoice?${params}`
+
+    // Cache hit — replay immediately
+    const cached = audioCache.get(url)
+    if (cached && cached.readyState >= 2) { cached.play(); resolve(); return }
+
+    const audio = new Audio(url)
+    audio.preload = 'auto'
+    audioCache.set(url, audio)
+    if (audioCache.size > 100) audioCache.delete(audioCache.keys().next().value)
+
+    audio.onended = () => resolve()
+    audio.onerror = () => {
+      debug.warn('[speakWord] Youdao failed, falling back to Web Speech')
+      webSpeechSpeak(text, language).finally(resolve)
     }
+    audio.play().catch(() => {
+      webSpeechSpeak(text, language).finally(resolve)
+    })
+  })
+}
 
-    // Cancel any ongoing speech first (mutual interruption with TTS)
+function webSpeechSpeak(text, language) {
+  return new Promise((resolve) => {
     speechSynthesis.cancel()
-
+    speechSynthesis.getVoices()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = language === 'ja' ? 'ja-JP' : 'en-US'
-    utterance.rate = 0.9  // Slightly slower for learners
+    utterance.rate = 0.85
     utterance.pitch = 1.0
     utterance.volume = 1.0
-
-    // Try to get a good voice
     const voice = getBestVoice(language)
-    if (voice) {
-      utterance.voice = voice
-    }
-
+    utterance.lang = voice ? voice.lang : (language === 'ja' ? 'ja-JP' : 'en-US')
+    if (voice) utterance.voice = voice
     utterance.onend = () => resolve()
-    utterance.onerror = (event) => {
-      // 'canceled' is intentional, don't treat as error
-      if (event.error === 'canceled' || event.error === 'interrupted') {
-        resolve()
-      } else {
-        debug.warn('[speakWord] Speech error:', event.error)
-        reject(event)
-      }
-    }
-
-    speechSynthesis.speak(utterance)
+    utterance.onerror = () => resolve()
+    setTimeout(() => speechSynthesis.speak(utterance), 50)
   })
 }

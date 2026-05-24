@@ -1,7 +1,8 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import './LookUpPanel.css'
 import { TYPE_CONFIG, JA_TYPE_CONFIG } from '../config/languages'
+import { speakWord } from '../utils/speech'
 
 // 语法知识点备用释义映射
 const GRAMMAR_FALLBACK_MEANINGS = {
@@ -62,6 +63,7 @@ const TIP_TEXT_KEYS = {
 
 const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en', isNarrow, onConfirmPoint, onDeletePoint }) {
   const { t } = useTranslation()
+  const [speaking, setSpeaking] = useState(false)
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
 
   if (!point) {
@@ -89,6 +91,14 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
   const displayMeaning = point.meaning || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'en') || t('grammarRulePrefix') + point.word + t('grammarCheckDetails')) : '')
   const displayMeaningChinese = point.meaningChinese || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'zh') || '') : '')
 
+  const handleSpeak = () => {
+    if (speaking) return
+    setSpeaking(true)
+    // 日语优先读假名注音（更稳定），英语读原词
+    const text = (language === 'ja' && point.phonetic) ? point.phonetic : point.word
+    speakWord(text, language).finally(() => setSpeaking(false))
+  }
+
   return (
     <div className="lup-card">
       {/* Word */}
@@ -96,7 +106,16 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
 
       {/* Phonetic — only for word or phrase types */}
       {(point.type === 'word' || point.type === 'phrase') && point.phonetic && (
-        <div className="lup-phonetic">{point.phonetic}</div>
+        <div className="lup-phonetic-row">
+          <button
+            className="lup-speak-btn"
+            onClick={(e) => { e.stopPropagation(); handleSpeak() }}
+            title={t('speakWord')}
+          >
+            {speaking ? '🔊' : '🔈'}
+          </button>
+          <span className="lup-phonetic">{point.phonetic}</span>
+        </div>
       )}
 
       {/* Type tag */}
