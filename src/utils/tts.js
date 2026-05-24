@@ -69,6 +69,11 @@ export async function speak(text, language = 'en', apiKey = null) {
   // Stop any currently playing audio before starting new one
   stopSpeaking()
 
+  // Also stop any Web Speech API playback
+  if (typeof speechSynthesis !== 'undefined') {
+    speechSynthesis.cancel()
+  }
+
   // Resolve API key: param → storage
   if (!apiKey) {
     apiKey = await getItem('qwen_tts_api_key')
@@ -91,10 +96,10 @@ export async function speak(text, language = 'en', apiKey = null) {
   const cachedUrl = audioCache.get(cacheKey)
   if (cachedUrl) {
     const audio = new Audio(cachedUrl)
-    currentAudio = audio
-    audio.onended = () => { currentAudio = null }
-    audio.onerror = () => { currentAudio = null }
-    await audio.play()
+      currentAudio = audio
+      audio.onended = () => { currentAudio = null }
+      audio.onerror = () => { currentAudio = null }
+      await audio.play()
     return
   }
 
@@ -121,8 +126,8 @@ export async function speak(text, language = 'en', apiKey = null) {
         const firstKey = audioCache.keys().next().value
         if (firstKey !== undefined) {
           audioCache.delete(firstKey)
-        }
       }
+}
       audioCache.set(cacheKey, data.audioUrl)
 
       const audio = new Audio(data.audioUrl)
@@ -137,3 +142,4 @@ export async function speak(text, language = 'en', apiKey = null) {
     console.error('TTS 请求出错:', e)
   }
 }
+

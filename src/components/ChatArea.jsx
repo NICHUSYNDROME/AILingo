@@ -799,13 +799,35 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       setIsProcessing(prev => ({ ...prev, spelling: true }))
       const sensitivity = ctx?.sensitivity || 'normal'
 
-      const [agent1Reply, spellCheckResult] = await Promise.all([
+      const [agent1Result, spellCheckResult] = await Promise.allSettled([
         sendToAI(text, conversationHistory, ctx, effectiveLastRound, language),
         correctUserMessage(text, sensitivity, language)
       ])
 
       setIsProcessing(prev => ({ ...prev, spelling: false }))
-      setCorrectionResult(spellCheckResult)
+
+      const agent1Reply = agent1Result.status === 'fulfilled' ? agent1Result.value : null
+      const spellCheckResultValue = spellCheckResult.status === 'fulfilled' ? spellCheckResult.value : null
+
+      // Agent 1 失败时的降级处理
+      if (!agent1Reply) {
+        console.error('[handleSend] Agent 1 (sendToAI) failed:', agent1Result.reason)
+        const errorMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.'
+        }
+        setMessages(prev => [...prev, errorMessage])
+        setLoading(false)
+        isSendingRef.current = false
+        return
+      }
+
+      if (spellCheckResult.status === 'rejected') {
+        console.warn('[handleSend] Agent 2A (correctUserMessage) failed:', spellCheckResult.reason)
+      }
+
+      setCorrectionResult(spellCheckResultValue)
 
       const parsed = parseAIReply(agent1Reply)
       const { mainText, goalAchieved } = parsed
@@ -814,7 +836,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       // ===== Step 2: Agent 2B - 语法分析（基于用户原文 vs 纠正后）=====
       console.log('[handleSend] Step 2: Agent 2B - 语法分析')
       setIsProcessing(prev => ({ ...prev, grammar: true }))
-      const correction = spellCheckResult?.correction
+      const correction = spellCheckResultValue?.correction
       const correctedText = correction?.corrected || text
       const grammarResult = await analyzeGrammar(text, correctedText, conversationHistory, sensitivity, language)
       setIsProcessing(prev => ({ ...prev, grammar: false }))
@@ -824,12 +846,23 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       console.log('[handleSend] Step 3: 并行调用 Agent 2C + Agent 2D')
       setIsProcessing(prev => ({ ...prev, hints: true, extraction: true }))
 
-      const [hintsResult, extractionResult] = await Promise.all([
+      const [hintsSettled, extractionSettled] = await Promise.allSettled([
         generateHints(mainText, language),
         extractCorrectionsFromReply(mainText, language)
       ])
 
       setIsProcessing(prev => ({ ...prev, hints: false, extraction: false }))
+
+      const hintsResult = hintsSettled.status === 'fulfilled' ? hintsSettled.value : null
+      const extractionResult = extractionSettled.status === 'fulfilled' ? extractionSettled.value : null
+
+      if (hintsSettled.status === 'rejected') {
+        console.warn('[handleSend] Agent 2C (generateHints) failed:', hintsSettled.reason)
+      }
+      if (extractionSettled.status === 'rejected') {
+        console.warn('[handleSend] Agent 2D (extractCorrectionsFromReply) failed:', extractionSettled.reason)
+      }
+
       setHintsResult(hintsResult)
       setExtractedCorrections(extractionResult)
       console.log('[ChatArea] 2C hintsResult:', hintsResult)
@@ -909,7 +942,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       const newAnalysisResult = {
         tips: mergedTips,
         hints: hintsResult?.hints || null,
-        spellingCorrection: spellCheckResult || null,
+        spellingCorrection: spellCheckResultValue || null,
         grammarCorrections: grammarResult?.corrections || []
       }
       console.log('[handleSend] 存储分析结果到 analysisResults，key:', aiMessage.id, 'value:', newAnalysisResult)
