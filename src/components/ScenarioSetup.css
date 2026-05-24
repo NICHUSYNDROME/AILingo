@@ -269,9 +269,8 @@
 /* Textarea for goal input — auto-resize, matches input styles */
 .goal-textarea {
   resize: none;
-  overflow-y: hidden;
+  overflow: hidden;
   min-height: 38px;
-  max-height: 100px;
   padding: 7px 10px;
   line-height: 1.5;
   font-family: inherit;
@@ -313,6 +312,24 @@
 .goal-random-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Narrow mode: stack goal input + button vertically */
+@media (max-width: 899px) {
+  .goal-input-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .goal-textarea {
+    flex: none;
+  }
+
+  .goal-random-btn {
+    width: 100%;
+    height: 40px;
+    font-size: 14px;
+  }
 }
 
 /* Custom scenario input — shown when "自定义" is selected */

@@ -14,55 +14,49 @@
 .chat-header-row {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: space-between;
-  min-height: 40px;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
-  padding: 8px 14px;
+  padding: 6px 10px;
   z-index: 10;
 }
 
-.chat-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
+/* Scenario info — compact inline for wide mode */
+.chat-system-msg {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.6;
+  margin-left: auto;
 }
 
-.chat-header-left .chat-system-msg {
-  flex: 1;
-  font-size: 12.5px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Scenario name bold + colored */
 .chat-system-msg .scenario-name {
+  display: block;
   font-weight: 700;
   color: #1a73e8;
+  margin-bottom: 2px;
 }
 
-/* Detail lines (Sensitivity, Max Rounds) in gray */
 .chat-system-msg .detail-line {
+  display: block;
   color: var(--text-tertiary);
   font-weight: 400;
 }
 
-/* ===== TODO list in header (right side, inline with info) ===== */
+/* ===== TODO list in header (center) ===== */
 .chat-todo-list {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 2px;
   padding: 0;
-  min-width: 130px;
-  max-width: 220px;
-  border-left: 1px solid var(--border-color);
-  padding-left: 12px;
+  margin: 0 auto;
 }
 
 .chat-todo-title {
@@ -71,12 +65,19 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.chat-todo-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .chat-todo-item {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
+  gap: 4px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-primary);
@@ -108,6 +109,56 @@
   word-break: break-word;
 }
 
+/* ── Narrow-mode header ── */
+.chat-header-narrow {
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.chat-sysinfo-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chat-sysinfo-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+}
+
+.chat-sysinfo-popup {
+  position: absolute;
+  top: 42px;
+  right: 8px;
+  z-index: 1801;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  line-height: 1.8;
+  min-width: 180px;
+}
+
+.chat-sysinfo-row {
+  color: var(--text-primary);
+}
+
+.chat-sysinfo-row strong {
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
 /* ===== Scrollable messages area ===== */
 .chat-messages {
   flex: 1;
@@ -122,18 +173,6 @@
   margin: auto;
   font-size: 14px;
   color: var(--text-tertiary);
-}
-
-.chat-system-msg {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  background: var(--code-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-  white-space: pre-wrap;
-  line-height: 1.6;
-  text-align: center;
 }
 
 .chat-msg-group {

@@ -30,19 +30,40 @@
   line-height: 1;
   padding: 0;
   position: relative;
-  transition: background 0.15s;
+  transition: transform 0.15s;
+}
+
+/* Hover: subtle semi-transparent overlay to "highlight" the emoji */
+.tab-nav-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tab-nav-btn:hover::after {
+  opacity: 0.1;
 }
 
 .tab-nav-btn:hover {
-  background: var(--hover-bg);
+  background: transparent;
+  transform: scale(1.1);
 }
 
+/* Selected: visible circular background */
 .tab-nav-active {
   background: var(--bg-secondary);
 }
 
 .tab-nav-active:hover {
   background: var(--bg-secondary);
+}
+
+.tab-nav-active::after {
+  display: none;
 }
 
 /* ── Icon wrapper (for badge positioning) ── */
@@ -69,4 +90,36 @@
   padding: 0 4px;
   box-shadow: 0 0 0 2px var(--bg-primary);
   pointer-events: none;
+}
+
+/* ── Narrow mode: inline row in topbar, no capsule ── */
+@media (max-width: 899px) {
+  .tab-nav {
+    flex-direction: row;
+    gap: 2px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    width: auto;
+    margin: 0;
+    align-self: auto;
+  }
+
+  .tab-nav-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .tab-nav-badge {
+    box-shadow: 0 0 0 2px var(--card-bg);
+  }
+}
+.tab-nav-extra {
+  font-size: 14px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.tab-nav-extra:hover {
+  opacity: 1;
 }

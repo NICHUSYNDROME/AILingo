@@ -214,3 +214,36 @@
   color: var(--text-tertiary);
   margin: 0;
 }
+
+/* ── Narrow-mode action buttons ── */
+.lup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.lup-action-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.lup-action-keep:hover {
+  border-color: var(--success-color);
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+.lup-action-discard:hover {
+  border-color: var(--error-color);
+  background: var(--error-bg);
+  color: var(--error-color);
+}
