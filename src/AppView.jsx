@@ -261,6 +261,8 @@ function AppView(props) {
     isNarrow,
     centerState,
     dueForReviewCount,
+    selectionBubble,
+    dismissSelectionBubble,
   } = props
 
   const showTopToggles = isNarrow && centerState !== 'idle'
@@ -309,6 +311,19 @@ function AppView(props) {
             onClose={() => setShowApiModal(false)}
           />
         </Suspense>
+      )}
+      {/* ── Mobile selection lookup bubble ── */}
+      {isNarrow && selectionBubble && (
+        <button
+          className="selection-lookup-btn"
+          style={{ left: selectionBubble.x, top: selectionBubble.y }}
+          onClick={() => {
+            handleDictSearchOpenRight(selectionBubble.word)
+            dismissSelectionBubble()
+          }}
+        >
+          🔍
+        </button>
       )}
       <Layout
         left={

@@ -111,6 +111,7 @@ function App() {
     dictQuery, setDictQuery,
     dictLoading,
     selectedPointId, setSelectedPointId,
+    selectionBubble, dismissSelectionBubble,
     handleSidebarUpdate, handleSidebarClose,
     handleSelectPoint,
     handleDictSearch, handleDictSearchFromSelection, handleDictKeyDown,
@@ -207,6 +208,8 @@ function App() {
       handleDictSearch={handleDictSearch}
       handleDictSearchFromSelection={handleDictSearchFromSelection}
       handleDictKeyDown={handleDictKeyDown}
+      selectionBubble={selectionBubble}
+      dismissSelectionBubble={dismissSelectionBubble}
     />
   )
 }

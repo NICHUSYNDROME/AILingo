@@ -21,6 +21,8 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
   const [dictLoading, setDictLoading] = useState(false)
   const [selectedPointId, setSelectedPointId] = useState(null)
   const [highlightedMessageId, setHighlightedMessageId] = useState(null)
+  const [selectionBubble, setSelectionBubble] = useState(null)
+  const selectionTimerRef = useRef(null)
 
   const dictSearchRef = useRef(null)
 
@@ -221,6 +223,43 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // ── Mobile selection bubble ──────────────────────────────────────
+  const dismissSelectionBubble = useCallback(() => setSelectionBubble(null), [])
+
+  useEffect(() => {
+    const handleSelection = () => {
+      if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current)
+      selectionTimerRef.current = setTimeout(() => {
+        const sel = window.getSelection()
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+          setSelectionBubble(null)
+          return
+        }
+        const text = sel.toString().trim()
+        // Ignore selections inside inputs
+        const node = sel.anchorNode
+        if (node && node.parentElement?.closest('input, textarea')) {
+          setSelectionBubble(null)
+          return
+        }
+        const range = sel.getRangeAt(0).cloneRange()
+        range.collapse(false)
+        const rect = range.getClientRects().item(0)
+        if (!rect) { setSelectionBubble(null); return }
+        setSelectionBubble({
+          word: text,
+          x: rect.left + rect.width / 2,
+          y: rect.top - 8,
+        })
+      }, 200)
+    }
+    document.addEventListener('selectionchange', handleSelection)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelection)
+      if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current)
+    }
+  }, [])
+
   return {
     sidebarContent, sidebarContentType,
     expandedChinese, setExpandedChinese,
@@ -228,6 +267,7 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
     dictLoading,
     selectedPointId, setSelectedPointId,
     highlightedMessageId,
+    selectionBubble, dismissSelectionBubble,
     handleSidebarUpdate, handleSidebarClose,
     handleSelectPoint,
     handleDictSearch, handleDictSearchFromSelection, handleDictKeyDown,

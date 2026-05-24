@@ -1070,3 +1070,33 @@
   background: #ff7875;
   border-color: #ff7875;
 }
+
+/* ===== Mobile selection lookup bubble ===== */
+.selection-lookup-btn {
+  position: fixed;
+  z-index: 10000;
+  transform: translate(-50%, -100%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  transition: transform 0.15s, opacity 0.15s;
+  animation: bubbleIn 0.2s ease-out;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(0.5); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
+.selection-lookup-btn:active {
+  transform: translate(-50%, -100%) scale(0.9);
+}
