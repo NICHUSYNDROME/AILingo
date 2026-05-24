@@ -28,6 +28,9 @@ dist-ssr
 release/
 *.app
 
+# Custom agent definitions (workspace-level)
+.github/agents/
+
 # User data (never commit personal settings)
 *.settings.json
 
