@@ -232,7 +232,7 @@ cat > "release/AILingo.app/Contents/Info.plist" << 'PLISTEOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>
-    <string>icon.icns</string>
+    <string>icon</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleDevelopmentRegion</key>
