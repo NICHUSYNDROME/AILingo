@@ -1,6 +1,6 @@
 // 语言列表
 export const LANGUAGES = [
-  { key: 'en', label: 'English', flag: '🇬🇧' },
+  { key: 'en', label: 'English', flag: '🇺🇸' },
   { key: 'ja', label: '日本語', flag: '🇯🇵' },
 ]
 

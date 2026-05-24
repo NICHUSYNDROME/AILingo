@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
+import { SCENARIOS } from '../config/languages'
 import './ScenarioSetup.css'
 
 const ScenarioSetup = memo(function ScenarioSetup({
@@ -29,7 +29,6 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
   // Get scenarios for current language
   const currentScenarios = SCENARIOS[language] || SCENARIOS.en
-  const currentSensitivityLabels = SENSITIVITY_LABELS[language] || SENSITIVITY_LABELS.en
 
   // Auto-resize textarea to fit content (runs before paint, every render)
   useLayoutEffect(() => {
@@ -221,7 +220,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
                 className={`sensitivity-btn ${sensitivity === key ? 'active' : ''}`}
                 onClick={() => onSensitivityChange(key)}
               >
-                {currentSensitivityLabels[key]}
+                {{ loose: '🥱', normal: '🙂', strict: '🧐' }[key]}
               </button>
             ))}
           </div>
@@ -290,7 +289,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
               </div>
               <div className="confirm-item">
                 <span className="confirm-label">{t('sensitivity')}</span>
-                <span className="confirm-value">{currentSensitivityLabels[sensitivity] || sensitivity}</span>
+                <span className="confirm-value">{{ loose: '🥱', normal: '🙂', strict: '🧐' }[sensitivity] || sensitivity}</span>
               </div>
               <div className="confirm-item">
                 <span className="confirm-label">{t('maxRounds')}</span>
