@@ -1,14 +1,18 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
 import ScenarioSetup from './components/ScenarioSetup'
-import ChatArea from './components/ChatArea'
 import KnowledgeSidebar from './components/KnowledgeSidebar'
 import LookUpPanel from './components/LookUpPanel'
 import ProgressDashboard from './components/ProgressDashboard'
-import QuizPanel from './components/QuizPanel'
 import { generateConversationGoal, testDeepSeekKey } from './api'
-import ApiKeyModal from './components/ApiKeyModal'
-import { getItem, setItem, removeItem } from './utils/storage'
+import { getItem, setItem, removeItem, syncAllFromFile } from './utils/storage'
+import { useScenarioState } from './hooks/useScenarioState'
+import { useSidebarState } from './hooks/useSidebarState'
+
+// Lazy-loaded components (not on first screen)
+const ChatArea = lazy(() => import('./components/ChatArea'))
+const QuizPanel = lazy(() => import('./components/QuizPanel'))
+const ApiKeyModal = lazy(() => import('./components/ApiKeyModal'))
 
 import { useKnowledgePoints } from './hooks/useKnowledgePoints'
 import { useLanguage } from './context/LanguageContext'
@@ -87,9 +91,13 @@ function App() {
   const [modalMode, setModalMode] = useState('welcome') // 'welcome' | 'settings'
   const [appReady, setAppReady] = useState(false)
 
-  // 初始化：检查 API Key
+  // 初始化：同步 Electron 文件数据 → localStorage，然后检查 API Key
   useEffect(() => {
-    async function checkApiKey() {
+    async function initApp() {
+      // 1. 将 Electron 文件存储同步到 localStorage，确保浏览器 dev 模式数据互通
+      await syncAllFromFile()
+
+      // 2. 检查 API Key
       const key = await getItem('deepseek_api_key')
       if (!key) {
         setModalMode('welcome')
@@ -104,7 +112,7 @@ function App() {
       }
       setAppReady(true)
     }
-    checkApiKey()
+    initApp()
   }, [])
 
   // === TTS mute state (persisted to localStorage & Electron storage) ===
@@ -130,30 +138,25 @@ function App() {
   }, [])
 
 
-  // === Three-state management: 'idle' | 'chatting' | 'quiz' ===
-  const [centerState, setCenterState] = useState('idle')
-
-  // Get scenarios for current language
+  // === Scenario + center state machine ===
   const currentScenarios = SCENARIOS[language] || SCENARIOS.en
-  // Default to the first scenario value
-  const [scenario, setScenario] = useState(currentScenarios[0]?.value || 'restaurant')
-  const [conversationGoal, setConversationGoal] = useState('')
-  const [sensitivity, setSensitivity] = useState('normal')
-  const [maxRounds, setMaxRounds] = useState(10)
-  const [targetKnowledge, setTargetKnowledge] = useState(5)
-  const [sidebarContent, setSidebarContent] = useState(null)
-  const [sidebarContentType, setSidebarContentType] = useState(null) // 'dict' | 'point'
-  const [expandedChinese, setExpandedChinese] = useState(false)
-  const [dictQuery, setDictQuery] = useState('')
-  const [dictLoading, setDictLoading] = useState(false)
-  const [selectedPointId, setSelectedPointId] = useState(null)
-  const [highlightedMessageId, setHighlightedMessageId] = useState(null)
+  const {
+    centerState,
+    scenario, setScenario,
+    conversationGoal, setConversationGoal,
+    sensitivity, setSensitivity,
+    maxRounds, setMaxRounds,
+    targetKnowledge, setTargetKnowledge,
+    conversationKey,
+    conversationContextRef,
+    handleStartChat,
+    handleGenerateGoal,
+    handleChatEnd,
+    handleStartQuiz,
+    handleQuizEnd,
+  } = useScenarioState(language, currentScenarios)
 
-  const conversationContextRef = useRef(null)
-  const conversationIdRef = useRef(0)
-  const [conversationKey, setConversationKey] = useState(0)
-
-  // Pass language to useKnowledgePoints for data isolation
+  // === Knowledge points ===
   const {
     knowledgePoints,
     addPoint,
@@ -166,253 +169,23 @@ function App() {
     updatePoint,
   } = useKnowledgePoints(language)
 
-  // Reset scenario when language changes (only when idle)
-  useEffect(() => {
-    const firstScenario = currentScenarios[0]?.value || 'restaurant'
-    setScenario(firstScenario)
-    setConversationGoal('')
-  }, [language]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Use a ref to hold the latest handleDictSearchFromSelection callback,
-  // so the global keydown listener can safely reference it without
-  // initialization-order issues (TDZ / "Cannot access before initialization").
-  const dictSearchRef = useRef(null)
-
-  // Global keyboard shortcut: Cmd+Shift+K (Mac) / Ctrl+Shift+K (Windows)
-  // for selection-based dictionary search. Works in any app state (idle/chatting/quiz).
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Ignore if focus is inside an input or textarea (let normal typing work)
-      if (e.target.closest('input, textarea, [contenteditable]')) return
-
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault()
-        const selection = window.getSelection().toString().trim()
-        if (selection && dictSearchRef.current) {
-          dictSearchRef.current(selection)
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, []) // empty deps — ref is stable, never needs re-registration
-
-  // === State transition handlers ===
-
-  const handleStartChat = useCallback((params) => {
-    conversationContextRef.current = {
-      scenario: params.scenario,
-      goal: params.goal || '',
-      sensitivity: params.sensitivity,
-      maxRounds: params.maxRounds,
-      targetKnowledge: params.targetKnowledge,
-    }
-    // Increment conversation key to force ChatArea remount (resets all internal state)
-    conversationIdRef.current += 1
-    setConversationKey(conversationIdRef.current)
-    setCenterState('chatting')
-  }, [])
-
-  const handleGenerateGoal = useCallback(async (scenario) => {
-    return await generateConversationGoal(scenario, language)
-  }, [language])
-
-  // Called by ChatArea when conversation ends (summary done + user clicks "Start New Conversation")
-  const handleChatEnd = useCallback(() => {
-    setCenterState('idle')
-  }, [])
-
-  // Called by ProgressDashboard "Start Quiz" button
-  const handleStartQuiz = useCallback(() => {
-    setCenterState('quiz')
-  }, [])
-
-  // Called by QuizPanel "Back to Home" button
-  const handleQuizEnd = useCallback(() => {
-    setCenterState('idle')
-  }, [])
-
-  const handleSidebarUpdate = useCallback((content) => {
-    setSidebarContent(content)
-    setSidebarContentType('dict')
-  }, [])
-
-  const handleSidebarClose = useCallback(() => {
-    setSidebarContent(null)
-    setSidebarContentType(null)
-    setExpandedChinese(false)
-    setSelectedPointId(null)
-  }, [])
-
-  // Handle selecting a knowledge point (backtracking)
-  // Uses getPointById to always show live data (confirmed status stays in sync)
-  const handleSelectPoint = useCallback(
-    (pointId) => {
-      setSelectedPointId(pointId)
-      const point = getPointById(pointId)
-      if (!point) return
-
-      // We set sidebarContent to the live point so LookUpPanel can use it
-      setSidebarContent(point)
-      setSidebarContentType('point')
-      setExpandedChinese(false)
-
-      // Highlight source message in chat area
-      if (point.sourceMessageId) {
-        setHighlightedMessageId(point.sourceMessageId)
-
-        // Scroll to the message
-        setTimeout(() => {
-          const el = document.querySelector(
-            `[data-message-id="${point.sourceMessageId}"]`
-          )
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            // Add highlight class
-            el.classList.add('message-highlight')
-            // Remove highlight after 2 seconds
-            setTimeout(() => {
-              el.classList.remove('message-highlight')
-            }, 2000)
-          }
-        }, 100)
-      }
-    },
-    [getPointById]
-  )
+  // === Sidebar + dictionary ===
+  const {
+    sidebarContent, sidebarContentType,
+    expandedChinese, setExpandedChinese,
+    dictQuery, setDictQuery,
+    dictLoading,
+    selectedPointId, setSelectedPointId,
+    highlightedMessageId,
+    handleSidebarUpdate, handleSidebarClose,
+    handleSelectPoint,
+    handleDictSearch, handleDictSearchFromSelection, handleDictKeyDown,
+  } = useSidebarState(language, knowledgePoints, addPoint, getPointById, conversationContextRef, getDictSystemPrompt)
 
   /**
    * Parse JSON from AI response, handling markdown code blocks if present.
    */
-  const parseJSONResponse = useCallback((text) => {
-    let jsonStr = text.trim()
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1].trim()
-    }
-    return JSON.parse(jsonStr)
-  }, [])
-
-  /**
-   * Perform a dictionary search: call the AI API with a JSON-format prompt,
-   * parse the structured result, and display it in the LookUp panel.
-   */
-  const handleDictSearch = useCallback(async () => {
-    const word = dictQuery.trim()
-    if (!word || dictLoading) return
-
-    setDictLoading(true)
-    setSidebarContent(`🔍 Searching for "${word}"...`)
-    setSidebarContentType('dict')
-
-    try {
-      const apiKey = await getItem('deepseek_api_key')
-      if (!apiKey) {
-        setSidebarContent({ error: '⚠️ Please provide a valid API Key first.' })
-        setSidebarContentType('dict')
-        setDictLoading(false)
-        return
-      }
-
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: getDictSystemPrompt(language) },
-            { role: 'user', content: `Define the word: "${word}"` },
-          ],
-          stream: false,
-          temperature: 0,
-        }),
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await removeItem('deepseek_api_key')
-          setSidebarContent({ error: '⚠️ API Key is invalid or expired.' })
-        } else {
-          setSidebarContent({ error: `❌ Query failed (${response.status}).` })
-        }
-        setDictLoading(false)
-        return
-      }
-
-      const data = await response.json()
-      const aiResponse = data.choices[0].message.content
-
-      // Parse JSON from AI response
-      let dictData
-      try {
-        dictData = parseJSONResponse(aiResponse)
-      } catch (parseError) {
-        console.error('Failed to parse AI response as JSON:', aiResponse)
-        setSidebarContent({ error: 'Failed to parse word definition', raw: aiResponse })
-        setSidebarContentType('dict')
-        setDictLoading(false)
-        return
-      }
-
-      // Build complete knowledge point
-      const knowledgePoint = {
-        id: Date.now(),
-        word: dictData.word || word,
-        type: dictData.type || 'word',
-        meaning: dictData.definition || 'Definition not found',
-        meaningChinese: dictData.meaningChinese || '',
-        phonetic: dictData.phonetic || '',
-        partOfSpeech: dictData.partOfSpeech || '',
-        context: conversationContextRef.current?.scenario || 'Dictionary',
-        examples: dictData.examples || [`Example using "${word}"`],
-        createdAt: new Date().toISOString(),
-        confirmed: false,
-        status: 'active',
-      }
-
-      // Check for existing point
-      const existingPoint = knowledgePoints.find(
-        (p) => p.word.toLowerCase() === word.toLowerCase() && p.status !== 'deleted'
-      )
-
-      if (existingPoint) {
-        setSelectedPointId(existingPoint.id)
-        setSidebarContent(existingPoint)
-      } else {
-        const added = addPoint(knowledgePoint)
-        if (added) {
-          setSelectedPointId(added.id)
-          setSidebarContent(added)
-        } else {
-          // If addPoint failed (race condition), still display the point
-          setSelectedPointId(knowledgePoint.id)
-          setSidebarContent(knowledgePoint)
-        }
-      }
-
-      setSidebarContentType('point')
-      setExpandedChinese(false)
-    } catch {
-      setSidebarContent({ error: '❌ Network error. Please try again.' })
-      setSidebarContentType('dict')
-    }
-    setDictLoading(false)
-  }, [dictQuery, dictLoading, knowledgePoints, addPoint, parseJSONResponse])
-
-  const handleDictKeyDown = useCallback(
-    (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        handleDictSearch()
-      }
-    },
-    [handleDictSearch]
-  )
-
+  // === Knowledge point mutation handlers ===
   const handleDeletePoint = useCallback(
     (id) => {
       deletePoint(id)
@@ -448,117 +221,6 @@ function App() {
     },
     [updatePoint]
   )
-
-  // Handle dict search triggered by Cmd+Shift+K selection
-  const handleDictSearchFromSelection = useCallback(
-    async (word) => {
-      setDictQuery(word)
-      setDictLoading(true)
-      setSidebarContent(`🔍 Searching for "${word}"...`)
-      setSidebarContentType('dict')
-
-      try {
-        const apiKey = await getItem('deepseek_api_key')
-        if (!apiKey) {
-          setSidebarContent({ error: '⚠️ Please provide a valid API Key first.' })
-          setSidebarContentType('dict')
-          setDictLoading(false)
-          return
-        }
-
-        const response = await fetch('https://api.deepseek.com/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'deepseek-chat',
-            messages: [
-              { role: 'system', content: getDictSystemPrompt(language) },
-              { role: 'user', content: `Define the word: "${word}"` },
-            ],
-            stream: false,
-            temperature: 0,
-          }),
-        })
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            await removeItem('deepseek_api_key')
-            setSidebarContent({ error: '⚠️ API Key is invalid or expired.' })
-          } else {
-            setSidebarContent({ error: `❌ Query failed (${response.status}).` })
-          }
-          setDictLoading(false)
-          return
-        }
-
-        const data = await response.json()
-        const aiResponse = data.choices[0].message.content
-
-        // Parse JSON from AI response
-        let dictData
-        try {
-          dictData = parseJSONResponse(aiResponse)
-        } catch (parseError) {
-          console.error('Failed to parse AI response as JSON:', aiResponse)
-          setSidebarContent({ error: 'Failed to parse word definition', raw: aiResponse })
-          setSidebarContentType('dict')
-          setDictLoading(false)
-          return
-        }
-
-        // Build complete knowledge point
-        const knowledgePoint = {
-          id: Date.now(),
-          word: dictData.word || word,
-          type: dictData.type || 'word',
-          meaning: dictData.definition || 'Definition not found',
-          meaningChinese: dictData.meaningChinese || '',
-          phonetic: dictData.phonetic || '',
-          partOfSpeech: dictData.partOfSpeech || '',
-          context: conversationContextRef.current?.scenario || 'Dictionary',
-          examples: dictData.examples || [`Example using "${word}"`],
-          createdAt: new Date().toISOString(),
-          confirmed: false,
-          status: 'active',
-        }
-
-        // Check for existing point
-        const existingPoint = knowledgePoints.find(
-          (p) => p.word.toLowerCase() === word.toLowerCase() && p.status !== 'deleted'
-        )
-
-        if (existingPoint) {
-          setSelectedPointId(existingPoint.id)
-          setSidebarContent(existingPoint)
-        } else {
-          const added = addPoint(knowledgePoint)
-          if (added) {
-            setSelectedPointId(added.id)
-            setSidebarContent(added)
-          } else {
-            setSelectedPointId(knowledgePoint.id)
-            setSidebarContent(knowledgePoint)
-          }
-        }
-
-        setSidebarContentType('point')
-        setExpandedChinese(false)
-      } catch {
-        setSidebarContent({ error: '❌ Network error. Please try again.' })
-        setSidebarContentType('dict')
-      }
-      setDictLoading(false)
-    },
-    [knowledgePoints, addPoint, parseJSONResponse]
-  )
-
-  // Keep the global shortcut ref in sync with the latest callback
-  useEffect(() => {
-    dictSearchRef.current = handleDictSearchFromSelection
-  }, [handleDictSearchFromSelection])
 
   // === Render center content based on state ===
   const renderCenter = () => {
@@ -598,7 +260,8 @@ function App() {
 
       case 'chatting':
         return (
-          <ChatArea
+          <Suspense fallback={<div className="center-loading">Loading conversation…</div>}>
+            <ChatArea
             key={conversationKey}
             language={language}
             isChatStarted={true}
@@ -613,17 +276,20 @@ function App() {
             onUpdatePoint={handleUpdatePoint}
             knowledgePoints={knowledgePoints}
           />
+          </Suspense>
         )
 
       case 'quiz':
         return (
-          <QuizPanel
+          <Suspense fallback={<div className="center-loading">Loading quiz…</div>}>
+            <QuizPanel
             language={language}
             knowledgePoints={knowledgePoints}
             getPointById={getPointById}
             updatePointReview={updatePointReview}
             onBackToHome={handleQuizEnd}
           />
+          </Suspense>
         )
 
       default:
@@ -634,11 +300,13 @@ function App() {
   return (
     <>
       {showApiModal && (
-        <ApiKeyModal
-          mode={modalMode}
-          onComplete={() => setShowApiModal(false)}
-          onClose={() => setShowApiModal(false)}
-        />
+        <Suspense fallback={null}>
+          <ApiKeyModal
+            mode={modalMode}
+            onComplete={() => setShowApiModal(false)}
+            onClose={() => setShowApiModal(false)}
+          />
+        </Suspense>
       )}
       <Layout
         left={
