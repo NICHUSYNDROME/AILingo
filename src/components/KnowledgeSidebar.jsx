@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import './KnowledgeSidebar.css'
-import { TYPE_CONFIG, JA_TYPE_CONFIG } from '../config/languages'
+import { TYPE_CONFIG, JA_TYPE_CONFIG, ALPHABETS, getJaSortKey } from '../config/languages'
 import LookUpPanel from './LookUpPanel'
 
 const KnowledgeSidebar = memo(function KnowledgeSidebar({
@@ -18,12 +18,40 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
   const [searchQuery, setSearchQuery] = useState('')
   const [sortMethod, setSortMethod] = useState('recent')
+  const [sortReversed, setSortReversed] = useState(false)
   const [newPointIds, setNewPointIds] = useState(new Set())
   const [expandedPointId, setExpandedPointId] = useState(null)  // narrow-mode inline detail
   const [expandedChinese, setExpandedChinese] = useState(false)
   const listRef = useRef(null)
   const prevCountRef = useRef(knowledgePoints.length)
+  // Build alphabet index map for the current language（英语用，区分大小写）
+  const alphaIndex = useMemo(() => {
+    const alphabet = ALPHABETS[language] || ALPHABETS.en
+    const map = {}
+    for (let i = 0; i < alphabet.length; i++) {
+      map[alphabet[i]] = i
+    }
+    return map
+  }, [language])
 
+  // Compare two points alphabetically
+  const alphaCompare = useCallback((a, b) => {
+    if (language === 'ja') {
+      // 日语按假名读音排序（用 phonetic，无则用 word）
+      const aText = a.phonetic || a.word
+      const bText = b.phonetic || b.word
+      const aKey = getJaSortKey(aText)
+      const bKey = getJaSortKey(bText)
+      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0
+    }
+    // 英语：区分大小写，大写在前
+    const aCh = a.word[0] ?? ''
+    const bCh = b.word[0] ?? ''
+    const aIdx = alphaIndex[aCh] ?? Infinity
+    const bIdx = alphaIndex[bCh] ?? Infinity
+    if (aIdx !== bIdx) return aIdx - bIdx
+    return a.word.localeCompare(b.word)
+  }, [language, alphaIndex])
   // Detect new points added and scroll to top (new points are inserted at the front)
   useEffect(() => {
     const currentCount = knowledgePoints.length
@@ -77,7 +105,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
     const sorted = [...filtered]
     switch (sortMethod) {
       case 'alphabet':
-        sorted.sort((a, b) => a.word.localeCompare(b.word))
+        sorted.sort(alphaCompare)
         break
       case 'difficulty':
         sorted.sort((a, b) => a.easeFactor - b.easeFactor)
@@ -86,7 +114,6 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
         sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         break
       case 'mastery':
-        // unconfirmed first, then confirmed
         sorted.sort((a, b) => {
           if (!a.confirmed && b.confirmed) return -1
           if (a.confirmed && !b.confirmed) return 1
@@ -96,9 +123,19 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
       default:
         break
     }
+    if (sortReversed) sorted.reverse()
 
     return sorted
-  }, [knowledgePoints, searchQuery, sortMethod])
+  }, [knowledgePoints, searchQuery, sortMethod, sortReversed, alphaCompare])
+
+  const handleSortClick = useCallback((method) => {
+    if (sortMethod === method) {
+      setSortReversed(prev => !prev)
+    } else {
+      setSortMethod(method)
+      setSortReversed(false)
+    }
+  }, [sortMethod])
 
   const handleDeleteClick = useCallback(
     (e, point) => {
@@ -162,9 +199,9 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
           <button
             key={btn.key}
             className={`kp-sort-btn ${sortMethod === btn.key ? 'active' : ''}`}
-            onClick={() => setSortMethod(btn.key)}
+            onClick={() => handleSortClick(btn.key)}
           >
-            {btn.label}
+            {btn.label}{sortMethod === btn.key ? (sortReversed ? ' ▼' : ' ▲') : ''}
           </button>
         ))}
       </div>
