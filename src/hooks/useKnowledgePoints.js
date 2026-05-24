@@ -156,10 +156,6 @@ export function useKnowledgePoints(language = 'en') {
     debug.log('[addPoint] Received phonetic:', data.phonetic, 'type:', data.type)
 
     const meaningChinese = (data.meaningChinese || '').trim()
-    if (!meaningChinese && data.source !== 'spelling_correction' && data.source !== 'grammar_correction') {
-      debug.warn(`[useKnowledgePoints] 知识点 "${data.word || 'unknown'}" 的中文释义为空，跳过添加`)
-      return null
-    }
 
     let examples = data.examples
     if (!examples && data.example) {
@@ -199,8 +195,6 @@ export function useKnowledgePoints(language = 'en') {
       confirmed: false,
       createdAt: new Date().toISOString(),
     }
-    let added = false
-    let existingId = null
     setKnowledgePoints((prev) => {
       const normalizedWord = point.word.toLowerCase().trim()
       const existing = prev.find(
@@ -208,36 +202,27 @@ export function useKnowledgePoints(language = 'en') {
           p.word.toLowerCase().trim() === normalizedWord &&
           p.status !== 'deleted'
       )
-      if (existing) {
-        if (data.source === 'spelling_correction' || data.source === 'grammar_correction') {
-          const updatedPoint = {
-            ...existing,
-            repetitions: (existing.repetitions || 0) + 0.5,
-            easeFactor: Math.max(1.3, (existing.easeFactor || 2.5) - 0.1),
-            nextReview: getLocalDateString(),
-            ...(data.meaning ? { meaning: data.meaning } : {}),
-            ...(data.meaningChinese ? { meaningChinese: data.meaningChinese } : {}),
-            ...(data.phonetic ? { phonetic: data.phonetic } : {}),
-          }
-          const updated = prev.map(p => p.id === existing.id ? updatedPoint : p)
-          schedulePersist(updated)
-          debug.log(`[useKnowledgePoints] 知识点已存在，调整掌握程度: ${point.word}`)
-          existingId = existing.id
-          return updated
+      if (existing && (data.source === 'spelling_correction' || data.source === 'grammar_correction')) {
+        const updatedPoint = {
+          ...existing,
+          repetitions: (existing.repetitions || 0) + 0.5,
+          easeFactor: Math.max(1.3, (existing.easeFactor || 2.5) - 0.1),
+          nextReview: getLocalDateString(),
+          ...(data.meaning ? { meaning: data.meaning } : {}),
+          ...(data.meaningChinese ? { meaningChinese: data.meaningChinese } : {}),
+          ...(data.phonetic ? { phonetic: data.phonetic } : {}),
         }
-        debug.log(`[useKnowledgePoints] 知识点已存在，跳过: ${point.word}`)
-        return prev
+        const updated = prev.map(p => p.id === existing.id ? updatedPoint : p)
+        schedulePersist(updated)
+        debug.log(`[useKnowledgePoints] 知识点已存在，调整掌握程度: ${point.word}`)
+        return updated
       }
-      added = true
       const updated = [point, ...prev]
       schedulePersist(updated)
       debug.log('[useKnowledgePoints] 添加知识点，当前总数:', updated.length)
       return updated
     })
-    if (existingId) {
-      return { id: existingId }
-    }
-    return added ? point : null
+    return point
   }, [schedulePersist])
 
   const deletePoint = useCallback((id) => {

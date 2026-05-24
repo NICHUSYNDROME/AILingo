@@ -86,7 +86,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
   const typeConfig = typeConfigMap[point.type] || typeConfigMap.word
 
   // 为 grammar 类型生成备用释义
-  const displayMeaning = point.meaning || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'en') || t('grammarRulePrefix') + point.word + ' - Check your correction for details.') : '')
+  const displayMeaning = point.meaning || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'en') || t('grammarRulePrefix') + point.word + t('grammarCheckDetails')) : '')
   const displayMeaningChinese = point.meaningChinese || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'zh') || '') : '')
 
   return (
@@ -165,7 +165,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
           {!point.confirmed && onConfirmPoint && (
             <button
               className="lup-action-btn lup-action-keep"
-              onClick={(e) => { e.stopPropagation(); onConfirmPoint(point.id) }}
+              onClick={(e) => { e.stopPropagation(); onConfirmPoint(point) }}
             >
               {t('keep')}
             </button>
@@ -173,7 +173,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
           {onDeletePoint && (
             <button
               className="lup-action-btn lup-action-discard"
-              onClick={(e) => { e.stopPropagation(); onDeletePoint(point.id) }}
+              onClick={(e) => { e.stopPropagation(); onDeletePoint(point) }}
             >
               {t('discard')}
             </button>

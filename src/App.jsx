@@ -118,13 +118,13 @@ function App() {
 
   // === Knowledge point mutation handlers ===
   const handleDeletePoint = useCallback(
-    (id) => {
+    (pointOrId) => {
+      const id = typeof pointOrId === 'object' ? pointOrId.id : pointOrId
       deletePoint(id)
-      if (selectedPointId === id) {
-        setSelectedPointId(null)
-      }
+      handleSidebarClose()
+      setDictQuery('')
     },
-    [deletePoint, selectedPointId, setSelectedPointId]
+    [deletePoint, handleSidebarClose, setDictQuery]
   )
 
   const handleMarkMastered = useCallback(
@@ -133,7 +133,8 @@ function App() {
   )
 
   const handleConfirmPoint = useCallback(
-    (id) => {
+    (pointOrId) => {
+      const id = typeof pointOrId === 'object' ? pointOrId.id : pointOrId
       confirmPoint(id)
       setTimeout(() => {
         const confirmedCount = getConfirmedCount()

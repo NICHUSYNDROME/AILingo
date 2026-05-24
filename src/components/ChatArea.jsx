@@ -810,7 +810,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         const errorMessage = {
           id: generateMessageId(),
           role: 'assistant',
-          content: 'Sorry, I encountered an error. Please try again.'
+          content: t('chatError')
         }
         setMessages(prev => [...prev, errorMessage])
         setLoading(false)
@@ -1053,7 +1053,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     return (
       <div className="chat-area">
         <div className="chat-messages">
-          <p className="chat-placeholder">Set up scenario parameters and start a conversation</p>
+          <p className="chat-placeholder">{t('chatPlaceholder')}</p>
         </div>
       </div>
     )
@@ -1072,13 +1072,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       {showBackConfirm && (
         <div className="chat-end-overlay" onClick={() => setShowBackConfirm(false)}>
           <div className="chat-end-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="chat-end-dialog-title">End this conversation?</div>
+            <div className="chat-end-dialog-title">{t('endDialogTitle')}</div>
             <div className="chat-end-dialog-text">
-              Your progress will not be saved as a summary.
+              {t('endDialogBackText')}
             </div>
             <div className="chat-end-dialog-actions">
-              <button className="chat-end-dialog-cancel" onClick={() => setShowBackConfirm(false)}>Cancel</button>
-              <button className="chat-end-dialog-confirm" onClick={handleBackToIdle}>End</button>
+              <button className="chat-end-dialog-cancel" onClick={() => setShowBackConfirm(false)}>{t('confirmCancel')}</button>
+              <button className="chat-end-dialog-confirm" onClick={handleBackToIdle}>{t('endDialogEnd')}</button>
             </div>
           </div>
         </div>
@@ -1087,13 +1087,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       {showEndConfirm && (
         <div className="chat-end-overlay" onClick={() => setShowEndConfirm(false)}>
           <div className="chat-end-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="chat-end-dialog-title">End this conversation?</div>
+            <div className="chat-end-dialog-title">{t('endDialogTitle')}</div>
             <div className="chat-end-dialog-text">
-              A learning summary will be generated for the current conversation.
+              {t('endDialogEndText')}
             </div>
             <div className="chat-end-dialog-actions">
-              <button className="chat-end-dialog-cancel" onClick={() => setShowEndConfirm(false)}>Cancel</button>
-              <button className="chat-end-dialog-confirm" onClick={handleEndConversation}>End</button>
+              <button className="chat-end-dialog-cancel" onClick={() => setShowEndConfirm(false)}>{t('confirmCancel')}</button>
+              <button className="chat-end-dialog-confirm" onClick={handleEndConversation}>{t('endDialogEnd')}</button>
             </div>
           </div>
         </div>
@@ -1108,7 +1108,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         {/* ── TODO list (center, always visible) ── */}
         {todos.length > 0 && (
           <div className={`chat-todo-list ${isNarrow ? 'chat-todo-wide' : ''}`}>
-            <div className="chat-todo-title">TODO</div>
+            <div className="chat-todo-title">{t('todo')}</div>
             <div className="chat-todo-items">
               {todos.map((t) => (
                 <div key={t.id} className={`chat-todo-item ${t.completed ? 'completed' : ''}`}>
@@ -1129,9 +1129,9 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
               return (
                 <>
                   <div className="scenario-name">📋 {info.scenarioName}</div>
-                  <div className="detail-line">Sensitivity: {info.sensitivity}</div>
-                  <div className="detail-line">Max Rounds: {info.maxRounds}</div>
-                  <div className="detail-line">Target Knowledge: {info.targetKnowledge}</div>
+                  <div className="detail-line">{t('sensitivityInfoLabel')} {info.sensitivity}</div>
+                  <div className="detail-line">{t('maxRoundsInfoLabel')} {info.maxRounds}</div>
+                  <div className="detail-line">{t('targetKnowledgeInfoLabel')} {info.targetKnowledge}</div>
                 </>
               )
             })()}
@@ -1151,10 +1151,10 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                     if (!info) return null
                     return (
                       <>
-                        <div className="chat-sysinfo-row"><strong>Scenario:</strong> {info.scenarioName}</div>
-                        <div className="chat-sysinfo-row"><strong>Sensitivity:</strong> {info.sensitivity}</div>
-                        <div className="chat-sysinfo-row"><strong>Max Rounds:</strong> {info.maxRounds}</div>
-                        <div className="chat-sysinfo-row"><strong>Target Knowledge:</strong> {info.targetKnowledge}</div>
+                        <div className="chat-sysinfo-row"><strong>{t('scenarioInfoLabel')}</strong> {info.scenarioName}</div>
+                        <div className="chat-sysinfo-row"><strong>{t('sensitivityInfoLabel')}</strong> {info.sensitivity}</div>
+                        <div className="chat-sysinfo-row"><strong>{t('maxRoundsInfoLabel')}</strong> {info.maxRounds}</div>
+                        <div className="chat-sysinfo-row"><strong>{t('targetKnowledgeInfoLabel')}</strong> {info.targetKnowledge}</div>
                       </>
                     )
                   })()}
@@ -1252,14 +1252,14 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   return (
                     <div className="correction-tips-bubble">
                       <div className="correction-tips-header" onClick={() => toggleCorrectionTipsForMessage(msg.id)} style={{ cursor: 'pointer' }}>
-                        <span>✏️ Corrections & Tips</span>
+                        <span>✏️ {t('correctionsTips')}</span>
                         <span className="correction-tips-toggle">{isExpanded ? '▲' : '▼'}</span>
                       </div>
                       {isExpanded && (
                         <div className="correction-tips-content">
                           {hasCorrection && (
                             <div className="correction-tips-section">
-                              <div className="correction-tips-section-title">Correction</div>
+                              <div className="correction-tips-section-title">{t('sectionCorrection')}</div>
                               <div className="correction-content">
                                 <div
                                   className="correction-text"
@@ -1275,7 +1275,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                           )}
                           {hasTips && (
                             <div className="correction-tips-section">
-                              <div className="correction-tips-section-title">Tips</div>
+                              <div className="correction-tips-section-title">{t('sectionTips')}</div>
                               <div className="tips-content">
                                 {analysisResults[nextAssistantId].tips.map((tip, ti) => (
                                   <div key={ti} className="tip-item">
@@ -1308,7 +1308,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   {analysisResults[msg.id]?.hints && analysisResults[msg.id]?.hints?.suggestions?.length > 0 && (
                     <div className={`hints-section ${hintsExpandedMap[msg.id] ? '' : 'collapsed'}`}>
                       <div className="hints-header" onClick={() => toggleHintsForMessage(msg.id)}>
-                        <span>📘 Hints</span>
+                        <span>📘 {t('sectionHints')}</span>
                         <span className="hints-toggle">{hintsExpandedMap[msg.id] ? '▲' : '▼'}</span>
                       </div>
                       {hintsExpandedMap[msg.id] && (
@@ -1319,7 +1319,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                               <div key={si} className="hint-item">
                                 <span className="hint-word">{s.word}</span>
                                 <span className="hint-translation"> / {s.translation}</span>
-                                <button className="hint-lookup-btn" onClick={() => { if (onDictSearchFromSelection) { onDictSearchFromSelection(s.word) } }} title={language === 'ja' ? '辞書で調べる' : '查词'}>🔍 {language === 'ja' ? '調べる' : '查词'}</button>
+                                <button className="hint-lookup-btn" onClick={() => { if (onDictSearchFromSelection) { onDictSearchFromSelection(s.word) } }} title={t('lookupBtnTitle')}>🔍 {t('lookupBtn')}</button>
                               </div>
                             ))}
                           </div>
@@ -1341,7 +1341,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
         {summaryLoading && (
           <div className="summary-generating">
-            <span>Conversation ended, generating summary</span>
+            <span>{t('summaryGenerating')}</span>
             <BouncingDots />
           </div>
         )}
@@ -1349,8 +1349,8 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       {!isMaxReached && !summaryDone && !endingRef.current && (
         <div className="chat-input-bar">
-          <textarea className="chat-input" placeholder="Type a message, Command+Enter to send" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading || endingRef.current} rows={1} />
-          <button className="chat-send-btn" onClick={handleSend} disabled={loading || !input.trim() || endingRef.current}>Send</button>
+          <textarea className="chat-input" placeholder={t('inputPlaceholder')} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading || endingRef.current} rows={1} />
+          <button className="chat-send-btn" onClick={handleSend} disabled={loading || !input.trim() || endingRef.current}>{t('sendBtn')}</button>
         </div>
       )}
 

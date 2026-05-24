@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getItem, setItem } from '../utils/storage'
 import { debug } from '../utils/debug'
 import { testDeepSeekKey, testTTSKey } from '../api'
@@ -22,6 +23,7 @@ function maskApiKey(key) {
  * @param {function} onClose - 设置模式关闭时回调
  */
 export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
+  const { t } = useTranslation()
   const [deepseekKey, setDeepseekKey] = useState('')
   const [ttsKey, setTtsKey] = useState('')
   const [showDeepseek, setShowDeepseek] = useState(false)
@@ -90,17 +92,17 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
 
     // 校验必填
     if (!actualDeepseekKey) {
-      setTestResult({ type: 'error', message: '请输入 DeepSeek API Key' })
+      setTestResult({ type: 'error', message: t('validateKeyEmpty') })
       return
     }
 
     setTesting(true)
-    setTestResult({ type: 'info', message: '正在测试 DeepSeek API Key...' })
+    setTestResult({ type: 'info', message: t('testingDeepseek') })
 
     // 测试 DeepSeek
     const dsResult = await testDeepSeekKey(actualDeepseekKey)
     if (!dsResult.valid) {
-      setTestResult({ type: 'error', message: `DeepSeek Key 无效：${dsResult.error}` })
+      setTestResult({ type: 'error', message: `${t('deepseekInvalid')}${dsResult.error}` })
       setTesting(false)
       return
     }
@@ -112,7 +114,7 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
 
     // 如果填了 TTS Key，测试并保存（失败不影响）
     if (actualTTSKey) {
-      setTestResult({ type: 'info', message: '正在测试千问 TTS API Key...' })
+      setTestResult({ type: 'info', message: t('testingTTS') })
       const ttsResult = await testTTSKey(actualTTSKey)
       if (ttsResult.valid) {
         await setItem('qwen_tts_api_key', actualTTSKey)
@@ -124,7 +126,7 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
       }
     }
 
-    setTestResult({ type: 'success', message: 'DeepSeek API Key 验证成功！' })
+    setTestResult({ type: 'success', message: t('deepseekSuccess') })
     setTesting(false)
 
     // 引导模式：延迟跳转
@@ -143,17 +145,17 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
     <div className="apikey-modal-overlay">
       <div className="apikey-modal-card">
         <h1 className="apikey-modal-title">AILingo</h1>
-        <p className="apikey-modal-subtitle">你的 AI 语言学习助手</p>
+        <p className="apikey-modal-subtitle">{t('apiKeySubtitle')}</p>
 
         {/* DeepSeek API Key */}
         <div className="apikey-modal-field">
-          <label>DeepSeek API Key <span className="required">*</span></label>
+          <label>{t('apiKeyDeepseekLabel')} <span className="required">{t('apiKeyRequired')}</span></label>
           <div className="apikey-modal-input-row">
             <input
               type={showDeepseek ? 'text' : 'password'}
               value={deepseekKey}
               onChange={(e) => setDeepseekKey(e.target.value)}
-              placeholder="sk-..."
+              placeholder={t('apiKeyDeepseekPlaceholder')}
               disabled={testing}
               autoFocus
             />
@@ -170,19 +172,19 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
             onClick={(e) => { e.preventDefault(); openExternalLink('https://platform.deepseek.com/api_keys') }}
             className="apikey-link"
           >
-            获取 DeepSeek API Key →
+            {t('apiKeyGetDeepseek')}
           </a>
         </div>
 
         {/* 千问 TTS API Key */}
         <div className="apikey-modal-field">
-          <label>千问 TTS API Key <span className="optional">(可选)</span></label>
+          <label>{t('apiKeyTtsLabel')} <span className="optional">{t('apiKeyTtsOptional')}</span></label>
           <div className="apikey-modal-input-row">
             <input
               type={showTTS ? 'text' : 'password'}
               value={ttsKey}
               onChange={(e) => setTtsKey(e.target.value)}
-              placeholder="sk-...（用于语音朗读）"
+              placeholder={t('apiKeyTtsPlaceholder')}
               disabled={testing}
             />
             <button
@@ -198,7 +200,7 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
             onClick={(e) => { e.preventDefault(); openExternalLink('https://bailian.console.aliyun.com/cn-beijing?tab=model#/api-key') }}
             className="apikey-link"
           >
-            获取千问 API Key →
+            {t('apiKeyGetTts')}
           </a>
         </div>
 
@@ -218,17 +220,17 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
               onClick={handleTestAndSave}
               disabled={testing || !deepseekKey.trim()}
             >
-              {testing ? '测试中...' : '测试并开始使用'}
+              {testing ? t('testing') : t('testAndStart')}
             </button>
           ) : (
             <>
-              <button className="btn-secondary" onClick={handleCancel}>取消</button>
+              <button className="btn-secondary" onClick={handleCancel}>{t('confirmCancel')}</button>
               <button
                 className="btn-primary"
                 onClick={handleTestAndSave}
                 disabled={testing || !deepseekKey.trim()}
               >
-                {testing ? '测试中...' : '测试并保存'}
+                {testing ? t('testing') : t('testAndSave')}
               </button>
             </>
           )}

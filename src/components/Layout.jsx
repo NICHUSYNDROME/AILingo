@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import './Layout.css'
 
 function Layout({ left, center, right, settingsPanel, onHamburgerClick, isNarrow, leftOpen, rightOpen, onLeftToggle, onRightToggle, showTopToggles, topbarRight }) {
+  const { t } = useTranslation()
   const showLeftSidebar = !isNarrow || leftOpen
   const showRightSidebar = !isNarrow || rightOpen
 
@@ -19,8 +21,8 @@ function Layout({ left, center, right, settingsPanel, onHamburgerClick, isNarrow
             {topbarRight}
             {showTopToggles && (
               <div className="layout-topbar-toggles">
-                <button className="layout-topbar-toggle-btn" onClick={onLeftToggle} title="Knowledge">📚</button>
-                <button className="layout-topbar-toggle-btn" onClick={onRightToggle} title="Dictionary">📖</button>
+                <button className="layout-topbar-toggle-btn" onClick={onLeftToggle} title={t('knowledgeBtnTitle')}>📚</button>
+                <button className="layout-topbar-toggle-btn" onClick={onRightToggle} title={t('dictionaryBtnTitle')}>📖</button>
               </div>
             )}
           </div>
@@ -31,7 +33,7 @@ function Layout({ left, center, right, settingsPanel, onHamburgerClick, isNarrow
         {/* Left sidebar — fixed overlay in narrow mode, slides from top */}
         <aside className={`layout-left ${showLeftSidebar ? 'layout-left-open' : ''}`}>
           {isNarrow && (
-            <button className="layout-panel-back" onClick={onLeftToggle}>← Back</button>
+            <button className="layout-panel-back" onClick={onLeftToggle}>{t('quizBack')}</button>
           )}
           {left}
         </aside>
@@ -48,7 +50,7 @@ function Layout({ left, center, right, settingsPanel, onHamburgerClick, isNarrow
         {/* Right sidebar — fixed overlay in narrow mode, slides from top */}
         <aside className={`layout-right ${showRightSidebar ? 'layout-right-open' : ''}`}>
           {isNarrow && (
-            <button className="layout-panel-back" onClick={onRightToggle}>← Back</button>
+            <button className="layout-panel-back" onClick={onRightToggle}>{t('quizBack')}</button>
           )}
           {right}
         </aside>

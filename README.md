@@ -263,6 +263,8 @@ english-ai-learn/
 | **重复代码清理** | 删除 `api.js.bak`（737 行废弃备份），`useSidebarState` 改为复用共享 `parseJSONResponse`，`QuizPanel` 硬编码 URL 统一为 `API_URL` |
 | **调试日志优化** | 全项目 139+ 处 `console.log/warn` 替换为 `debug` 模块，生产构建自动 tree-shake（0 字节开销），`console.error` 保留 |
 | **打包体积** | 主包从 273.56 kB 降至 271.49 kB |
+| **搜索流程重构** | 查词时先查 `knowledgePoints` 缓存，已存在则直接显示、跳过 API 调用；`addPoint` 不再内部查重，避免 `setState` 回调异步执行的闭包过期问题 |
+| **详情面板同步** | 右侧 LookUp 面板优先从 `knowledgePoints` 取最新数据，确认/删除操作后状态实时同步 |
 
 ---
 

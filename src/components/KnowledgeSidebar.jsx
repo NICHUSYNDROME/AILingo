@@ -101,9 +101,9 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   }, [knowledgePoints, searchQuery, sortMethod])
 
   const handleDeleteClick = useCallback(
-    (e, id) => {
+    (e, point) => {
       e.stopPropagation()
-      onDelete(id)
+      onDelete(point)
     },
     [onDelete]
   )
@@ -240,7 +240,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                     )}
                     <button
                       className="kp-action-btn kp-discard-btn"
-                      onClick={(e) => handleDeleteClick(e, point.id)}
+                      onClick={(e) => handleDeleteClick(e, point)}
                       title={t('discardTooltip')}
                     >
                       {t('discard')}

@@ -1,4 +1,4 @@
-import { Suspense, memo, lazy, useState } from 'react'
+import { Suspense, memo, lazy, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import Layout from './components/Layout'
 import ScenarioSetup from './components/ScenarioSetup'
@@ -7,7 +7,6 @@ import LookUpPanel from './components/LookUpPanel'
 import ProgressDashboard from './components/ProgressDashboard'
 import SettingsPanel from './components/SettingsPanel'
 import TabNav from './components/TabNav'
-import { LANGUAGES } from './config/languages'
 import './App.css'
 
 const ChatArea = lazy(() => import('./components/ChatArea'))
@@ -170,7 +169,7 @@ const RightSidebar = memo(function RightSidebar(props) {
     deletePoint,
   } = props
 
-  const sidebarPoint = selectedPointId ? getPointById(selectedPointId) || sidebarContent : sidebarContent
+  const sidebarPoint = selectedPointId ? (getPointById(selectedPointId) || sidebarContent) : sidebarContent
 
   return (
     <div className="sidebar-content">
@@ -217,6 +216,10 @@ const RightSidebar = memo(function RightSidebar(props) {
               {sidebarContent.raw}
             </pre>
           )}
+        </div>
+      ) : sidebarContent?.info ? (
+        <div className="sidebar-detail" style={{ color: '#888' }}>
+          <p>{sidebarContent.info}</p>
         </div>
       ) : sidebarContent ? (
         <div className="sidebar-detail">{sidebarContent}</div>
@@ -277,6 +280,15 @@ function AppView(props) {
     setLeftOpen(false)
   }
 
+  // Wrap dict search to also open right sidebar in narrow mode
+  const handleDictSearchOpenRight = useCallback((word) => {
+    props.handleDictSearchFromSelection(word)
+    if (isNarrow) {
+      setRightOpen(true)
+      setLeftOpen(false)
+    }
+  }, [props.handleDictSearchFromSelection, isNarrow])
+
   // Narrow idle: build TabNav for topbar
   const narrowTabNav = isNarrow && centerState === 'idle' ? (
     <TabNav
@@ -311,7 +323,7 @@ function AppView(props) {
             getPointById={props.getPointById}
           />
         }
-        center={<CenterPanel {...props} isNarrow={isNarrow} activeTab={activeTab} setActiveTab={setActiveTab} />}
+        center={<CenterPanel {...props} isNarrow={isNarrow} activeTab={activeTab} setActiveTab={setActiveTab} handleDictSearchFromSelection={handleDictSearchOpenRight} />}
         right={<RightSidebar {...props} isNarrow={isNarrow} />}
         onHamburgerClick={() => setSettingsOpen(true)}
         isNarrow={isNarrow}
