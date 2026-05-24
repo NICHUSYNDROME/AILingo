@@ -106,37 +106,50 @@ export function useKnowledgePoints(language = 'en') {
     }
   }, [])
 
-  // Update storageKey when language changes
+  // ── Reload data when language changes ─────────────────────────
+  // Update storageKey reference
   useEffect(() => {
     storageKeyRef.current = getStorageKey(language)
   }, [language])
 
-  // ── Load from Electron storage (safety net, avoids flicker) ────
+  // When language changes, reload from localStorage immediately and
+  // then reconcile with Electron storage (safety net).
   useEffect(() => {
-    async function loadFromElectronStorage() {
+    let cancelled = false
+
+    async function reloadForLanguage() {
+      // 1) Load from localStorage for the NEW language (synchronous, instant).
+      const localData = loadFromStorage(language)
+
+      if (cancelled) return
+
+      // 2) Also try Electron storage for the new language.
       const key = getStorageKey(language)
       const stored = await getItem(key)
+
+      let resolved = localData
       if (stored) {
         try {
           const parsed = JSON.parse(stored)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Only update state if data actually differs (avoids flicker)
-            setKnowledgePoints((prev) => {
-              if (prev.length === parsed.length) {
-                // Quick check: same length, might be same data
-                const prevIds = new Set(prev.map((p) => p.id))
-                const allMatch = parsed.every((p) => prevIds.has(p.id))
-                if (allMatch) return prev // no change, skip re-render
-              }
-              return parsed
-            })
+          if (Array.isArray(parsed)) {
+            // Prefer Electron data; fall back to localStorage if Electron is empty.
+            resolved = parsed.length > 0 ? parsed : localData
           }
-        } catch (e) {
-          debug.error('[useKnowledgePoints] 从 Electron 存储加载解析失败:', e)
+        } catch {
+          // ignore parse errors, keep localStorage data
         }
       }
+
+      if (cancelled) return
+
+      setKnowledgePoints(resolved)
     }
-    loadFromElectronStorage()
+
+    reloadForLanguage()
+
+    return () => {
+      cancelled = true
+    }
   }, [language])
 
   const addPoint = useCallback((data) => {

@@ -14,9 +14,9 @@ function ThemeProvider({ children }) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
-  // 是否用户手动设置过
-  const [userSet, setUserSet] = useState(() => {
-    return localStorage.getItem('app_theme') !== null
+  // followSystem: true 表示跟随系统，false 表示手动设置
+  const [followSystem, setFollowSystemState] = useState(() => {
+    return localStorage.getItem('app_theme') === null
   })
 
   // Electron 环境下，从主进程文件加载真实值（覆盖 localStorage 初始值）
@@ -25,7 +25,7 @@ function ThemeProvider({ children }) {
       const saved = await getItem('app_theme')
       if (saved === 'light' || saved === 'dark') {
         setThemeState(saved)
-        setUserSet(true)
+        setFollowSystemState(false)
       }
     }
     loadFromStorage()
@@ -34,9 +34,21 @@ function ThemeProvider({ children }) {
   // 切换主题时同时写入 localStorage（同步，开发环境）和 storage.js（异步，Electron）
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme)
-    setUserSet(true)
+    setFollowSystemState(false)
     localStorage.setItem('app_theme', newTheme)
     setItem('app_theme', newTheme) // 异步，不等待
+  }, [])
+
+  // 设置是否跟随系统
+  const setFollowSystem = useCallback((follow) => {
+    setFollowSystemState(follow)
+    if (follow) {
+      // 清除手动设置，让系统决定
+      localStorage.removeItem('app_theme')
+      setItem('app_theme', null)
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      setThemeState(systemDark ? 'dark' : 'light')
+    }
   }, [])
 
   // 监听系统主题变化
@@ -44,15 +56,15 @@ function ThemeProvider({ children }) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
     const handleChange = (e) => {
-      // 仅当用户没有手动设置过主题时，跟随系统变化
-      if (!userSet) {
+      // 仅当跟随系统时，响应系统变化
+      if (followSystem) {
         setThemeState(e.matches ? 'dark' : 'light')
       }
     }
 
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [userSet])
+  }, [followSystem])
 
   // 将 data-theme 属性设置在根元素上
   useEffect(() => {
@@ -60,7 +72,7 @@ function ThemeProvider({ children }) {
   }, [theme])
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, followSystem, setFollowSystem }}>
       {children}
     </ThemeContext.Provider>
   )

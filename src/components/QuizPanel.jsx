@@ -186,16 +186,16 @@ function sortByReviewUrgency(points) {
 /**
  * Get the display label for a question type.
  */
-function getTypeLabel(type) {
+function getTypeLabel(type, uiText) {
   switch (type) {
     case 'choice':
-      return 'Multiple Choice'
+      return uiText.quizMultipleChoice
     case 'fill':
-      return 'Fill in the Blank'
+      return uiText.quizFillBlank
     case 'spelling':
-      return 'Spelling'
+      return uiText.quizSpelling
     case 'correction':
-      return 'Error Correction'
+      return uiText.quizErrorCorrection
     default:
       return type
   }
@@ -212,7 +212,7 @@ function extractFillHint(question) {
   return match ? match[1] : null
 }
 
-function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToHome, language = 'en' }) {
+function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToHome, language = 'en', uiText }) {
   const [questions, setQuestions] = useState([])
   const [answers, setAnswers] = useState({})
   const [loading, setLoading] = useState(true)
@@ -255,13 +255,13 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
     try {
       const apiKey = await getItem('deepseek_api_key')
       if (!apiKey) {
-        setError('Please provide a valid API Key first.')
+        setError(uiText.quizApiKeyMissing)
         setLoading(false)
         return
       }
 
       if (quizPoints.length === 0) {
-        setError('No knowledge points due for review.')
+        setError(uiText.quizNoPointsDue)
         setLoading(false)
         return
       }
@@ -299,9 +299,9 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       if (!response.ok) {
         if (response.status === 401) {
           await removeItem('deepseek_api_key')
-          setError('API Key is invalid or expired.')
+          setError(uiText.quizApiKeyInvalid)
         } else {
-          setError(`Quiz generation failed (${response.status}).`)
+          setError(`${uiText.quizGenFailed} (${response.status}).`)
         }
         setLoading(false)
         return
@@ -321,11 +321,11 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       if (parsed.questions && Array.isArray(parsed.questions)) {
         setQuestions(parsed.questions)
       } else {
-        setError('Failed to parse quiz data. Please try again.')
+        setError(uiText.quizParseFailed)
       }
     } catch (e) {
       debug.error('Quiz generation error:', e)
-      setError('Failed to generate quiz. Please try again.')
+      setError(uiText.quizGenError)
     }
     setLoading(false)
   }
@@ -372,8 +372,8 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
             questionIndex: idx,
             correct: isCorrect,
             explanation: isCorrect
-              ? 'Correct!'
-              : `The correct answer is: ${correctLetter}`,
+              ? uiText.quizCorrectExclaim
+              : `${uiText.quizCorrectAnswer}${correctLetter}`,
           })
         } else if (q.type === 'spelling') {
           // Spelling: local comparison (case-insensitive, trimmed)
@@ -383,8 +383,8 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
             questionIndex: idx,
             correct: isCorrect,
             explanation: isCorrect
-              ? 'Correct!'
-              : `The correct answer is: ${q.answer}`,
+              ? uiText.quizCorrectExclaim
+              : `${uiText.quizCorrectAnswer}${q.answer}`,
           })
         } else {
           // fill or correction — send to AI for review
@@ -454,7 +454,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                 reviews.push({
                   questionIndex: sq.index,
                   correct: false,
-                  explanation: 'Could not auto-review. Please check manually.',
+                  explanation: uiText.quizManualCheck,
                 })
               }
             })
@@ -465,7 +465,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
             reviews.push({
               questionIndex: sq.index,
               correct: false,
-              explanation: 'No API key available for review.',
+              explanation: uiText.quizNoApiKey,
             })
           })
         }
@@ -515,7 +515,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       <div className="quiz-panel">
         <div className="quiz-loading">
           <div className="quiz-loading-spinner" />
-          <p className="quiz-loading-text">Generating quiz...</p>
+          <p className="quiz-loading-text">{uiText.quizGenerating}</p>
         </div>
       </div>
     )
@@ -528,7 +528,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
         <div className="quiz-error">
           <p className="quiz-error-text">{error}</p>
           <button className="quiz-back-btn" onClick={onBackToHome}>
-            Back to Home
+            {uiText.quizBackToHome}
           </button>
         </div>
       </div>
@@ -540,9 +540,9 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
     return (
       <div className="quiz-panel">
         <div className="quiz-error">
-          <p className="quiz-error-text">No questions generated.</p>
+          <p className="quiz-error-text">{uiText.quizNoQuestions}</p>
           <button className="quiz-back-btn" onClick={onBackToHome}>
-            Back to Home
+            {uiText.quizBackToHome}
           </button>
         </div>
       </div>
@@ -555,12 +555,12 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       <div className="quiz-panel">
         <div className="quiz-review">
           <div className="quiz-review-header">
-            <h2 className="quiz-review-title">Quiz Results</h2>
+            <h2 className="quiz-review-title">{uiText.quizResults}</h2>
             <div className="quiz-score">
               <span className="quiz-score-value">
                 {reviewData.correctCount}/{reviewData.totalCount}
               </span>
-              <span className="quiz-score-label">correct</span>
+              <span className="quiz-score-label">{uiText.quizCorrect}</span>
             </div>
           </div>
 
@@ -580,7 +580,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                       {isCorrect ? '✓' : '✗'}
                     </span>
                     <span className="quiz-review-q-type">
-                      {getTypeLabel(q.type)}
+                      {getTypeLabel(q.type, uiText)}
                     </span>
                     <span className="quiz-review-q-number">Q{idx + 1}</span>
                   </div>
@@ -620,15 +620,15 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                   )}
 
                   <div className="quiz-review-answer-row">
-                    <span className="quiz-review-answer-label">Your answer: </span>
+                    <span className="quiz-review-answer-label">{uiText.quizYourAnswer}</span>
                     <span className={`quiz-review-answer-value ${isCorrect ? 'text-correct' : 'text-wrong'}`}>
-                      {userAnswer || '(No answer)'}
+                      {userAnswer || uiText.quizNoAnswer}
                     </span>
                   </div>
 
                   {!isCorrect && (
                     <div className="quiz-review-answer-row">
-                      <span className="quiz-review-answer-label">Correct answer: </span>
+                      <span className="quiz-review-answer-label">{uiText.quizCorrectAnswer}</span>
                       <span className="quiz-review-answer-value text-correct">
                         {q.answer}
                       </span>
@@ -647,7 +647,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
           <div className="quiz-review-footer">
             <button className="quiz-back-btn" onClick={onBackToHome}>
-              Back to Home
+              {uiText.quizBackToHome}
             </button>
           </div>
         </div>
@@ -662,12 +662,12 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       <div className="quiz-header">
         <div className="quiz-header-left">
           <button className="quiz-header-back-btn" onClick={handleBackClick}>
-            ← Back
+            {uiText.quizBack}
           </button>
-          <h2 className="quiz-title">Knowledge Review Quiz</h2>
+          <h2 className="quiz-title">{uiText.quizTitle}</h2>
         </div>
         <span className="quiz-progress">
-          {questions.length} question{questions.length > 1 ? 's' : ''}
+          {questions.length} {uiText.quizQuestionCount}
         </span>
       </div>
 
@@ -675,13 +675,13 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       {showBackConfirm && (
         <div className="quiz-confirm-overlay">
           <div className="quiz-confirm-dialog">
-            <p className="quiz-confirm-text">Discard current quiz progress?</p>
+            <p className="quiz-confirm-text">{uiText.quizDiscardConfirm}</p>
             <div className="quiz-confirm-actions">
               <button className="quiz-confirm-btn quiz-confirm-cancel" onClick={handleCancelBack}>
-                Cancel
+                {uiText.quizCancel}
               </button>
               <button className="quiz-confirm-btn quiz-confirm-ok" onClick={handleConfirmBack}>
-                Discard
+                {uiText.quizDiscard}
               </button>
             </div>
           </div>
@@ -694,7 +694,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
           <div key={idx} className="quiz-question-card">
             <div className="quiz-q-header-row">
               <span className="quiz-q-type-badge">
-                {getTypeLabel(q.type)}
+                {getTypeLabel(q.type, uiText)}
               </span>
               <span className="quiz-q-number-label">Q{idx + 1}</span>
             </div>
@@ -726,7 +726,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                 <input
                   type="text"
                   className="quiz-q-input"
-                  placeholder="Type your answer..."
+                  placeholder={uiText.quizTypePlaceholder}
                   value={answers[idx] || ''}
                   onChange={(e) => handleAnswer(idx, e.target.value)}
                 />
@@ -744,7 +744,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                 <input
                   type="text"
                   className="quiz-q-input"
-                  placeholder="Type the word..."
+                  placeholder={uiText.quizSpellPlaceholder}
                   value={answers[idx] || ''}
                   onChange={(e) => handleAnswer(idx, e.target.value)}
                 />

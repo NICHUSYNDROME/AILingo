@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { debug } from '../utils/debug'
+import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
 import {
   sendToAI,
   parseAIReply,
@@ -233,7 +234,7 @@ const generateAnnotatedMessage = (originalText, annotations) => {
   }
 }
 
-function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [] }) {
+function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], uiText }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -357,7 +358,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       const doAiStart = async () => {
         const reply = await sendToAI(
-          'Please start the conversation based on the scenario settings. You go first, naturally leading into the topic.',
+          uiText.aiStartPrompt,
           [],
           ctx,
           false,
@@ -450,23 +451,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
   const getSystemMessage = () => {
     if (!ctx) return ''
-    const scenarioLabels = {
-      restaurant: 'Restaurant Ordering',
-      hotel: 'Hotel Check-in',
-      business: 'Business Meeting',
-      casual: 'Casual Chat',
-      custom: ctx.scenario || 'Custom',
-    }
-    const sensitivityLabels = {
-      loose: 'Loose',
-      normal: 'Normal',
-      strict: 'Strict',
-    }
-    const scenarioName = scenarioLabels[ctx.scenario] || ctx.scenario
-    const sensitivity = sensitivityLabels[ctx.sensitivity] || ctx.sensitivity
+    const currentScenarios = SCENARIOS[language] || SCENARIOS.en
+    const currentSensitivityLabels = SENSITIVITY_LABELS[language] || SENSITIVITY_LABELS.en
+    const scenarioLabel = currentScenarios.find((s) => s.value === ctx.scenario)?.label || ctx.scenario
+    const sensitivityLabel = currentSensitivityLabels[ctx.sensitivity] || ctx.sensitivity
     return {
-      scenarioName,
-      sensitivity,
+      scenarioName: scenarioLabel,
+      sensitivity: sensitivityLabel,
       maxRounds: ctx.maxRounds,
       targetKnowledge: ctx.targetKnowledge,
     }
@@ -505,7 +496,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     } catch {
       const fallbackMessage = {
         role: 'summary',
-        content: 'The conversation has ended. Click "Start New Conversation" to begin a new session.',
+        content: uiText.conversationEnded,
       }
       setMessages((prev) => [...prev, fallbackMessage])
       setSummaryError(true)
@@ -1108,7 +1099,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       <div className="chat-header-row">
         <div className="chat-header-left">
           {!summaryDone && !summaryLoading && (
-            <button className="chat-back-btn" onClick={() => setShowBackConfirm(true)} title="Back to home (abandon conversation)">← Back</button>
+            <button className="chat-back-btn" onClick={() => setShowBackConfirm(true)} title={uiText.backToHomeTooltip}>{uiText.quizBack}</button>
           )}
           <div className="chat-system-msg">
             {(() => {
@@ -1212,7 +1203,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                         setSpeakingMsgId(null)
                       }
                     }
-                  }} title={language === 'ja' ? '朗读（日语）' : 'Read aloud'}>{speakingMsgId === i ? '⏳' : '🔊'}</button>
+                  }} title={uiText.readAloud}>{speakingMsgId === i ? '⏳' : '🔊'}</button>
                 )}
               </div>
 
@@ -1330,7 +1321,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       {summaryDone && (
         <div className="chat-end-bar">
-          <button className="chat-new-btn" onClick={handleNewConversation}>Back to Home</button>
+          <button className="chat-new-btn" onClick={handleNewConversation}>{uiText.backToHome}</button>
         </div>
       )}
     </div>

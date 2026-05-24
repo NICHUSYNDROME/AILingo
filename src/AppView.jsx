@@ -1,9 +1,11 @@
-import { Suspense, memo, lazy } from 'react'
+import { Suspense, memo, lazy, useState } from 'react'
 import Layout from './components/Layout'
 import ScenarioSetup from './components/ScenarioSetup'
 import KnowledgeSidebar from './components/KnowledgeSidebar'
 import LookUpPanel from './components/LookUpPanel'
 import ProgressDashboard from './components/ProgressDashboard'
+import SettingsPanel from './components/SettingsPanel'
+import TabNav from './components/TabNav'
 import { LANGUAGES } from './config/languages'
 import './App.css'
 
@@ -36,6 +38,7 @@ const CenterPanel = memo(function CenterPanel(props) {
     handleSidebarUpdate,
     handleDictSearchFromSelection,
     getConfirmedCount,
+    dueForReviewCount,
     isMuted,
     addPoint,
     updatePoint,
@@ -46,46 +49,56 @@ const CenterPanel = memo(function CenterPanel(props) {
     conversationContextRef,
   } = props
 
+  const [activeTab, setActiveTab] = useState('chat')
+
   switch (centerState) {
     case 'idle':
       return (
         <div className="center-idle">
-          <div className="idle-scenario-section">
-            <ScenarioSetup
-              language={language}
-              uiText={uiText}
-              scenario={scenario}
-              conversationGoal={conversationGoal}
-              sensitivity={sensitivity}
-              maxRounds={maxRounds}
-              targetKnowledge={targetKnowledge}
-              onScenarioChange={setScenario}
-              onConversationGoalChange={setConversationGoal}
-              onSensitivityChange={setSensitivity}
-              onMaxRoundsChange={setMaxRounds}
-              onTargetKnowledgeChange={setTargetKnowledge}
-              onStartChat={handleStartChat}
-              generateGoal={handleGenerateGoal}
-            />
-          </div>
-          <div className="idle-progress-section">
-            <ProgressDashboard
-              language={language}
-              uiText={uiText}
-              knowledgePoints={knowledgePoints}
-              getConfirmedCount={getConfirmedCount}
-              onStartQuiz={handleStartQuiz}
-            />
+          <TabNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            dueCount={dueForReviewCount}
+            uiText={uiText}
+          />
+          <div className="idle-content">
+            {activeTab === 'chat' ? (
+              <ScenarioSetup
+                language={language}
+                uiText={uiText}
+                scenario={scenario}
+                conversationGoal={conversationGoal}
+                sensitivity={sensitivity}
+                maxRounds={maxRounds}
+                targetKnowledge={targetKnowledge}
+                onScenarioChange={setScenario}
+                onConversationGoalChange={setConversationGoal}
+                onSensitivityChange={setSensitivity}
+                onMaxRoundsChange={setMaxRounds}
+                onTargetKnowledgeChange={setTargetKnowledge}
+                onStartChat={handleStartChat}
+                generateGoal={handleGenerateGoal}
+              />
+            ) : (
+              <ProgressDashboard
+                language={language}
+                uiText={uiText}
+                getConfirmedCount={getConfirmedCount}
+                dueForReviewCount={dueForReviewCount}
+                onStartQuiz={handleStartQuiz}
+              />
+            )}
           </div>
         </div>
       )
 
     case 'chatting':
       return (
-        <Suspense fallback={<div className="center-loading">Loading conversation…</div>}>
+        <Suspense fallback={<div className="center-loading">{uiText.loadingConversation}</div>}>
           <ChatArea
             key={conversationKey}
             language={language}
+            uiText={uiText}
             isChatStarted={true}
             conversationContextRef={conversationContextRef}
             onSidebarUpdate={handleSidebarUpdate}
@@ -103,9 +116,10 @@ const CenterPanel = memo(function CenterPanel(props) {
 
     case 'quiz':
       return (
-        <Suspense fallback={<div className="center-loading">Loading quiz…</div>}>
+        <Suspense fallback={<div className="center-loading">{uiText.loadingQuiz}</div>}>
           <QuizPanel
             language={language}
+            uiText={uiText}
             knowledgePoints={knowledgePoints}
             getPointById={getPointById}
             updatePointReview={updatePointReview}
@@ -163,7 +177,7 @@ const RightSidebar = memo(function RightSidebar(props) {
           onClick={handleDictSearch}
           disabled={dictLoading || !dictQuery.trim()}
         >
-          {dictLoading ? '...' : 'Search'}
+          {dictLoading ? uiText.dictLoading : uiText.search}
         </button>
       </div>
       {sidebarContentType === 'point' ? (
@@ -172,6 +186,7 @@ const RightSidebar = memo(function RightSidebar(props) {
           expandedChinese={expandedChinese}
           onToggleChinese={() => setExpandedChinese((prev) => !prev)}
           language={language}
+          uiText={uiText}
         />
       ) : sidebarContent?.error ? (
         <div className="sidebar-detail" style={{ color: '#ff4d4f' }}>
@@ -190,51 +205,10 @@ const RightSidebar = memo(function RightSidebar(props) {
           expandedChinese={expandedChinese}
           onToggleChinese={() => setExpandedChinese((prev) => !prev)}
           language={language}
+          uiText={uiText}
         />
       )}
     </div>
-  )
-})
-
-const HeaderRight = memo(function HeaderRight(props) {
-  const { theme, setTheme, isMuted, setIsMuted, language, setLanguage, setShowApiModal, setModalMode } = props
-
-  return (
-    <>
-      <button
-        className="theme-toggle-btn"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-      >
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
-      <button
-        className="mute-toggle-btn"
-        onClick={() => setIsMuted((prev) => !prev)}
-        title={isMuted ? 'Unmute TTS' : 'Mute TTS'}
-      >
-        {isMuted ? '🔇' : '🔊'}
-      </button>
-      <button
-        className="settings-btn"
-        onClick={() => { setModalMode('settings'); setShowApiModal(true) }}
-        title="API Key 设置"
-      >
-        ⚙️
-      </button>
-      <div className="language-switcher">
-        {LANGUAGES.map((lang) => (
-          <button
-            key={lang.key}
-            className={`lang-btn ${language === lang.key ? 'lang-btn-active' : ''}`}
-            onClick={() => setLanguage(lang.key)}
-            title={lang.label}
-          >
-            {lang.flag} {lang.label}
-          </button>
-        ))}
-      </div>
-    </>
   )
 })
 
@@ -251,7 +225,18 @@ function AppView(props) {
     handleSelectPoint,
     selectedPointId,
     language,
+    setLanguage,
+    uiText,
+    theme,
+    followSystem,
+    setFollowSystem,
+    setTheme,
+    isMuted,
+    setIsMuted,
   } = props
+
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const autoReadAloud = !isMuted
 
   return (
     <>
@@ -273,11 +258,27 @@ function AppView(props) {
             onSelectPoint={handleSelectPoint}
             selectedPointId={selectedPointId}
             language={language}
+            uiText={uiText}
           />
         }
         center={<CenterPanel {...props} />}
         right={<RightSidebar {...props} />}
-        headerRight={<HeaderRight {...props} />}
+        onHamburgerClick={() => setSettingsOpen(true)}
+        settingsPanel={
+          <SettingsPanel
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            language={language}
+            setLanguage={setLanguage}
+            uiText={uiText}
+            theme={theme}
+            followSystem={followSystem}
+            setFollowSystem={setFollowSystem}
+            setTheme={setTheme}
+            autoReadAloud={autoReadAloud}
+            setAutoReadAloud={(v) => setIsMuted(!v)}
+          />
+        }
       />
     </>
   )

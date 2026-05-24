@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import AppView from './AppView'
 import { testDeepSeekKey } from './api'
 import { getItem, setItem, syncAllFromFile } from './utils/storage'
@@ -10,11 +10,12 @@ import { useLanguage } from './context/LanguageContext'
 import { useTheme } from './context/ThemeContext'
 import { SCENARIOS } from './config/languages'
 import { getDictSystemPrompt } from './config/prompts'
+import { getLocalDateString } from './utils/date'
 import './App.css'
 
 function App() {
   const { language, setLanguage, uiText } = useLanguage()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, followSystem, setFollowSystem } = useTheme()
 
   // === API Key modal state ===
   const [showApiModal, setShowApiModal] = useState(false)
@@ -90,6 +91,17 @@ function App() {
     updatePoint,
   } = useKnowledgePoints(language)
 
+  // Count confirmed points due for review today
+  const dueForReviewCount = useMemo(() => {
+    const todayStr = getLocalDateString()
+    return knowledgePoints.filter((p) => {
+      if (p.status === 'deleted') return false
+      if (p.confirmed !== true) return false
+      if (!p.nextReview) return true
+      return p.nextReview <= todayStr
+    }).length
+  }, [knowledgePoints])
+
   // === Sidebar + dictionary ===
   const {
     sidebarContent, sidebarContentType,
@@ -142,6 +154,8 @@ function App() {
       uiText={uiText}
       theme={theme}
       setTheme={setTheme}
+      followSystem={followSystem}
+      setFollowSystem={setFollowSystem}
       showApiModal={showApiModal}
       modalMode={modalMode}
       setShowApiModal={setShowApiModal}
@@ -173,6 +187,7 @@ function App() {
       confirmPoint={handleConfirmPoint}
       getPointById={getPointById}
       getConfirmedCount={getConfirmedCount}
+      dueForReviewCount={dueForReviewCount}
       updatePointReview={updatePointReview}
       updatePoint={handleUpdatePoint}
       sidebarContent={sidebarContent}

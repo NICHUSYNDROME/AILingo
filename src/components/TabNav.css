@@ -1,0 +1,72 @@
+/* ── Capsule container ── */
+.tab-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  width: 44px;
+  flex-shrink: 0;
+  align-self: center;
+  margin: 10px;
+  background: transparent;
+}
+
+/* ── Tab button ── */
+.tab-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.tab-nav-btn:hover {
+  background: var(--hover-bg);
+}
+
+.tab-nav-active {
+  background: var(--bg-secondary);
+}
+
+.tab-nav-active:hover {
+  background: var(--bg-secondary);
+}
+
+/* ── Icon wrapper (for badge positioning) ── */
+.tab-nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  line-height: 1;
+}
+
+/* ── Badge ── */
+.tab-nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -9px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px var(--bg-primary);
+  pointer-events: none;
+}

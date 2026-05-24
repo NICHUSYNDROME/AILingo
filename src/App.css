@@ -131,38 +131,25 @@
 
 /* ===== Sidebar Point Detail (Look Up panel) — migrated to LookUpPanel.css ===== */
 
-/* ===== Center idle state — two full-height containers ===== */
+/* ===== Center idle state — horizontal layout: TabNav + Content ===== */
 .center-idle {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Top half: ScenarioSetup — full width, content centered */
-.idle-scenario-section {
+/* Content area fills remaining space */
+.idle-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 100%;
   min-height: 0;
   overflow-y: auto;
-}
-
-/* Bottom half: ProgressDashboard — full width, content centered */
-.idle-progress-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--bg-secondary);
+  padding: 0;
 }
 
 /* ============================================================

@@ -86,7 +86,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
 
     // Validate custom scenario
     if (isCustom && !customScenario.trim()) {
-      setConfirmError(language === 'ja' ? 'カスタムシーンを入力してください' : '请输入自定义场景')
+      setConfirmError(uiText.validationCustomScenario)
       return
     }
 
@@ -110,12 +110,12 @@ const ScenarioSetup = memo(function ScenarioSetup({
   const handleConfirm = () => {
     // Validate: goal must not be empty
     if (!conversationGoal?.trim()) {
-      setConfirmError(language === 'ja' ? '会話の目標を入力または生成してください' : '请填写或生成对话目标')
+      setConfirmError(uiText.validationGoal)
       return
     }
     // Validate: if effective values are blank (shouldn't happen but safety check)
     if (!effectiveMaxRounds || !effectiveTargetKnowledge) {
-      setConfirmError(language === 'ja' ? '最大往復数と目標単語数を入力してください' : '最大轮次和目标知识点数不能为空')
+      setConfirmError(uiText.validationMaxRounds)
       return
     }
     setShowConfirm(false)
@@ -170,13 +170,13 @@ const ScenarioSetup = memo(function ScenarioSetup({
         {isCustom && (
           <div className="scenario-field">
             <label className="scenario-label">
-              {language === 'ja' ? 'カスタムシーン説明' : '自定义场景描述'}
+              {uiText.customScenarioLabel}
             </label>
             <input
               ref={customInputRef}
               type="text"
               className="scenario-input custom-scenario-input"
-              placeholder={language === 'ja' ? 'カスタムシーンを入力...' : '请输入自定义场景...'}
+              placeholder={uiText.customScenarioPlaceholder}
               value={customScenario}
               onChange={(e) => setCustomScenario(e.target.value)}
             />
@@ -190,7 +190,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
             <textarea
               ref={goalTextareaRef}
               className="scenario-input goal-input goal-textarea"
-              placeholder={language === 'ja' ? '会話の目標を入力、またはランダム生成...' : '输入对话目标，或点击随机生成...'}
+              placeholder={uiText.goalPlaceholder}
               value={conversationGoal}
               onChange={handleGoalInput}
               rows={1}
@@ -270,7 +270,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
         <div className="confirm-overlay" onClick={handleCancel}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3 className="confirm-title">
-              {language === 'ja' ? '会話設定の確認' : '确认对话设置'}
+              {uiText.confirmTitle}
             </h3>
             <div className="confirm-body">
               <div className="confirm-item">
@@ -280,7 +280,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
               <div className="confirm-item">
                 <span className="confirm-label">{uiText.conversationGoal}</span>
                 <span className="confirm-value confirm-goal-text">
-                  {conversationGoal || (goalLoading ? (language === 'ja' ? '会話の目標を生成中...' : '正在生成对话目标...') : (language === 'ja' ? '（未入力）' : '（未填写）'))}
+                  {conversationGoal || (goalLoading ? uiText.confirmGeneratingGoal : uiText.confirmUnfilled)}
                 </span>
               </div>
               <div className="confirm-item">
@@ -301,10 +301,10 @@ const ScenarioSetup = memo(function ScenarioSetup({
             )}
             <div className="confirm-actions">
               <button className="confirm-cancel-btn" onClick={handleCancel}>
-                {language === 'ja' ? 'キャンセル' : '取消'}
+                {uiText.confirmCancel}
               </button>
               <button className="confirm-ok-btn" onClick={handleConfirm}>
-                {language === 'ja' ? '確認して開始' : '确认开始'}
+                {uiText.confirmOk}
               </button>
             </div>
           </div>

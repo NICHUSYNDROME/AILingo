@@ -1,16 +1,25 @@
 import './Layout.css'
 
-function Layout({ left, center, right, headerRight }) {
+function Layout({ left, center, right, settingsPanel, onHamburgerClick }) {
   return (
     <div className="layout">
-      {headerRight && (
-        <div className="layout-header-right">
-          {headerRight}
-        </div>
-      )}
       <aside className="layout-left">{left}</aside>
       <main className="layout-center">{center}</main>
       <aside className="layout-right">{right}</aside>
+
+      {/* Hamburger menu button — bottom-left */}
+      <button
+        className="hamburger-btn"
+        onClick={onHamburgerClick}
+        aria-label="Settings"
+      >
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+        <span className="hamburger-line" />
+      </button>
+
+      {/* Settings panel */}
+      {settingsPanel}
     </div>
   )
 }

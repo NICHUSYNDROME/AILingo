@@ -9,6 +9,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   onSelectPoint,
   selectedPointId,
   language = 'en',
+  uiText,
 }) {
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
   const [searchQuery, setSearchQuery] = useState('')
@@ -117,22 +118,22 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   )
 
   const sortButtons = [
-    { key: 'alphabet', label: 'Alphabet' },
-    { key: 'difficulty', label: 'Difficulty' },
-    { key: 'recent', label: 'Recent' },
-    { key: 'mastery', label: 'Mastery' },
+    { key: 'alphabet', label: uiText.sortAlphabet },
+    { key: 'difficulty', label: uiText.sortDifficulty },
+    { key: 'recent', label: uiText.sortRecent },
+    { key: 'mastery', label: uiText.sortMastery },
   ]
 
   return (
     <div className="kp-sidebar">
-      <h3 className="kp-sidebar-title">Knowledge Points</h3>
+      <h3 className="kp-sidebar-title">{uiText.knowledgePoints}</h3>
 
       {/* Search bar */}
       <div className="kp-search-bar">
         <input
           className="kp-search-input"
           type="text"
-          placeholder="Search knowledge points..."
+          placeholder={uiText.searchPlaceholder}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -156,8 +157,8 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
         {displayPoints.length === 0 ? (
           <p className="kp-empty">
             {searchQuery.trim()
-              ? 'No matching knowledge points.'
-              : 'No knowledge points yet. Start a conversation!'}
+              ? uiText.noMatchingPoints
+              : uiText.noPoints}
           </p>
         ) : (
           displayPoints.map((point) => {
@@ -178,7 +179,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                   {/* Status dot */}
                   <span
                     className={`kp-status-dot ${isConfirmed ? 'kp-dot-confirmed' : 'kp-dot-unconfirmed'}`}
-                    title={isConfirmed ? 'Confirmed' : 'Pending confirmation'}
+                    title={isConfirmed ? uiText.confirmed : uiText.pendingConfirmation}
                   />
 
                   {/* Type tag */}
@@ -204,7 +205,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                           ? point.meaning.slice(0, 50) + '...'
                           : point.meaning)
                         : (point.type === 'grammar'
-                          ? (point.meaningChinese || 'Grammar rule')
+                          ? (point.meaningChinese || uiText.grammarRule)
                           : '')}
                     </span>
                   </div>
@@ -215,17 +216,17 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                       <button
                         className="kp-action-btn kp-keep-btn"
                         onClick={(e) => handleKeepClick(e, point.id)}
-                        title="Keep this knowledge point"
+                        title={uiText.keepTooltip}
                       >
-                        ✓ Keep
+                        {uiText.keep}
                       </button>
                     )}
                     <button
                       className="kp-action-btn kp-discard-btn"
                       onClick={(e) => handleDeleteClick(e, point.id)}
-                      title="Discard this knowledge point"
+                      title={uiText.discardTooltip}
                     >
-                      🗑 Discard
+                      {uiText.discard}
                     </button>
                   </div>
                 </div>

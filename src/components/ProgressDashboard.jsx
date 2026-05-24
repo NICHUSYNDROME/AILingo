@@ -1,13 +1,12 @@
 import { useMemo, memo } from 'react'
 import HeatmapCalendar from './HeatmapCalendar'
 import { getWeeklyStats } from '../utils/learningLog'
-import { getLocalDateString } from '../utils/date'
 
 const ProgressDashboard = memo(function ProgressDashboard({
   language,
   uiText,
-  knowledgePoints,
   getConfirmedCount,
+  dueForReviewCount,
   onStartQuiz,
 }) {
   const weeklyStats = useMemo(() => getWeeklyStats(language), [language])
@@ -15,17 +14,6 @@ const ProgressDashboard = memo(function ProgressDashboard({
   const confirmedCount = useMemo(() => {
     return getConfirmedCount ? getConfirmedCount() : 0
   }, [getConfirmedCount])
-
-  // Count points due for review: nextReview <= today or nextReview is null
-  const dueForReviewCount = useMemo(() => {
-    const todayStr = getLocalDateString()
-    return knowledgePoints.filter((p) => {
-      if (p.status === 'deleted') return false
-      if (p.confirmed !== true) return false
-      if (!p.nextReview) return true // null = never reviewed
-      return p.nextReview <= todayStr
-    }).length
-  }, [knowledgePoints])
 
   // Button is disabled when there are zero due-for-review points
   const hasDueForReview = dueForReviewCount > 0
@@ -37,7 +25,7 @@ const ProgressDashboard = memo(function ProgressDashboard({
       <div className="progress-body">
         {/* Left column: Heatmap Calendar */}
         <div className="progress-left">
-          <HeatmapCalendar language={language} />
+          <HeatmapCalendar language={language} uiText={uiText} />
         </div>
 
         {/* Divider */}
@@ -68,10 +56,10 @@ const ProgressDashboard = memo(function ProgressDashboard({
               title={
                 hasDueForReview
                   ? uiText.startQuiz
-                  : (language === 'ja' ? '復習待ちはありません' : '暂无待复习')
+                  : uiText.noDueForReviewTitle
               }
             >
-              {hasDueForReview ? `📝 ${uiText.startQuiz}` : (language === 'ja' ? '復習待ちなし' : '暂无待复习')}
+              {hasDueForReview ? `📝 ${uiText.startQuiz}` : uiText.noDueForReviewLabel}
             </button>
           </div>
         </div>

@@ -46,13 +46,20 @@ const getGrammarFallback = (word, field) => {
 }
 
 const TIPS = [
-  { key: 'select', icon: '\uD83D\uDD0D', text: 'Select a word in the conversation and press <kbd>Cmd+Shift+K</kbd> to look it up' },
-  { key: 'type', icon: '\u2328\uFE0F', text: 'Or type a word or phrase in the search box above' },
-  { key: 'confirm', icon: '\u2705', text: 'Confirm knowledge points from corrections to build your vocabulary list' },
-  { key: 'review', icon: '\uD83D\uDCDD', text: 'Review confirmed knowledge points with the quiz system' },
+  { key: 'select', icon: '\uD83D\uDD0D' },
+  { key: 'type', icon: '\u2328\uFE0F' },
+  { key: 'confirm', icon: '\u2705' },
+  { key: 'review', icon: '\uD83D\uDCDD' },
 ]
 
-const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en' }) {
+const TIP_TEXT_KEYS = {
+  select: 'lookUpTipSelect',
+  type: 'lookUpTipType',
+  confirm: 'lookUpTipConfirm',
+  review: 'lookUpTipReview',
+}
+
+const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en', uiText }) {
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
 
   if (!point) {
@@ -65,7 +72,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
               <span className="lup-idle-tip-icon">{tip.icon}</span>
               <span
                 className="lup-idle-tip-text"
-                dangerouslySetInnerHTML={{ __html: tip.text }}
+                dangerouslySetInnerHTML={{ __html: uiText[TIP_TEXT_KEYS[tip.key]] || '' }}
               />
             </div>
           ))}
@@ -77,7 +84,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
   const typeConfig = typeConfigMap[point.type] || typeConfigMap.word
 
   // 为 grammar 类型生成备用释义
-  const displayMeaning = point.meaning || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'en') || 'Grammar rule: ' + point.word + ' - Check your correction for details.') : '')
+  const displayMeaning = point.meaning || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'en') || uiText.grammarRulePrefix + point.word + ' - Check your correction for details.') : '')
   const displayMeaningChinese = point.meaningChinese || (point.type === 'grammar' ? (getGrammarFallback(point.word, 'zh') || '') : '')
 
   return (
@@ -103,11 +110,11 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
 
       {/* Definition */}
       <div className="lup-section">
-        <div className="lup-section-label">Definition</div>
+        <div className="lup-section-label">{uiText.definition}</div>
         {displayMeaning ? (
           <div className="lup-meaning-en">{displayMeaning}</div>
         ) : (
-          <div className="lup-meaning-en lup-meaning-empty">{'\uFF08\u6682\u65E0\u91CA\u4E49\uFF09'}</div>
+          <div className="lup-meaning-en lup-meaning-empty">{uiText.noDefinition}</div>
         )}
         <div className="lup-chinese-area">
           {displayMeaningChinese ? (
@@ -116,11 +123,11 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
                 <div className="lup-meaning-zh">{displayMeaningChinese}</div>
               )}
               <button className="lup-chinese-toggle" onClick={onToggleChinese}>
-                {expandedChinese ? 'Hide Chinese \u25B2' : 'Show Chinese \u25BC'}
+                {expandedChinese ? uiText.hideChinese : uiText.showChinese}
               </button>
             </>
           ) : (
-            <div className="lup-chinese-placeholder">暂无中文释义</div>
+            <div className="lup-chinese-placeholder">{uiText.noChineseDefinition}</div>
           )}
         </div>
       </div>
@@ -128,7 +135,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
       {/* Part of Speech */}
       {point.partOfSpeech && (
         <div className="lup-section">
-          <div className="lup-section-label">Part of Speech</div>
+          <div className="lup-section-label">{uiText.partOfSpeech}</div>
           <div className="lup-value">{point.partOfSpeech}</div>
         </div>
       )}
@@ -136,7 +143,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
       {/* Example */}
       {point.examples && point.examples.length > 0 && (
         <div className="lup-section">
-          <div className="lup-section-label">Example</div>
+          <div className="lup-section-label">{uiText.example}</div>
           <div className="lup-example">
             &ldquo;{point.examples[0]}&rdquo;
           </div>
@@ -146,7 +153,7 @@ const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggle
       {/* Context */}
       {point.context && (
         <div className="lup-section">
-          <div className="lup-section-label">Context</div>
+          <div className="lup-section-label">{uiText.context}</div>
           <div className="lup-context">{point.context}</div>
         </div>
       )}
