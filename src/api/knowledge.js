@@ -3,6 +3,7 @@
  */
 
 import { API_URL, getApiKey, parseJSONResponse } from './client'
+import { debug } from '../utils/debug'
 
 /**
  * Extract a single structured knowledge point from a specific trigger event.
@@ -120,10 +121,10 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
   ]
 
   // Debug: log the full system prompt to verify phonetic instructions are present
-  console.log('[extractSpecificKnowledge] === System Prompt (phonetic debug) ===')
-  console.log(systemPrompt)
-  console.log('[extractSpecificKnowledge] === End System Prompt ===')
-  console.log('[extractSpecificKnowledge] Trigger:', triggerDescription)
+  debug.log('[extractSpecificKnowledge] === System Prompt (phonetic debug) ===')
+  debug.log(systemPrompt)
+  debug.log('[extractSpecificKnowledge] === End System Prompt ===')
+  debug.log('[extractSpecificKnowledge] Trigger:', triggerDescription)
 
   try {
     const response = await fetch(API_URL, {
@@ -142,7 +143,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
     })
 
     if (!response.ok) {
-      console.warn('[extractSpecificKnowledge] API request failed:', response.status)
+      debug.warn('[extractSpecificKnowledge] API request failed:', response.status)
       return null
     }
 
@@ -150,22 +151,22 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
     const parsed = parseJSONResponse(data.choices[0].message.content)
 
     // Debug: log the parsed knowledge point to verify phonetic field
-    console.log('[extractSpecificKnowledge] Parsed knowledge point:', JSON.stringify(parsed, null, 2))
+    debug.log('[extractSpecificKnowledge] Parsed knowledge point:', JSON.stringify(parsed, null, 2))
 
     // Ensure it's a single object (not array)
     if (Array.isArray(parsed)) {
       const result = parsed.length > 0 ? parsed[0] : null
-      console.log('[extractSpecificKnowledge] Result (from array):', result ? result.word : null, 'phonetic:', result?.phonetic)
+      debug.log('[extractSpecificKnowledge] Result (from array):', result ? result.word : null, 'phonetic:', result?.phonetic)
       return result
     }
     if (parsed && typeof parsed === 'object' && parsed.word) {
-      console.log('[extractSpecificKnowledge] Result:', parsed.word, 'phonetic:', parsed.phonetic)
+      debug.log('[extractSpecificKnowledge] Result:', parsed.word, 'phonetic:', parsed.phonetic)
       return parsed
     }
-    console.log('[extractSpecificKnowledge] No valid knowledge point found in response')
+    debug.log('[extractSpecificKnowledge] No valid knowledge point found in response')
     return null
   } catch (error) {
-    console.warn('[extractSpecificKnowledge] Failed to parse:', error)
+    debug.warn('[extractSpecificKnowledge] Failed to parse:', error)
     return null
   }
 }

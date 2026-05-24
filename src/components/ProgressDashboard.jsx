@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import HeatmapCalendar from './HeatmapCalendar'
 import { getWeeklyStats } from '../utils/learningLog'
 import { getLocalDateString } from '../utils/date'
 
-function ProgressDashboard({
+const ProgressDashboard = memo(function ProgressDashboard({
   language,
   uiText,
   knowledgePoints,
@@ -78,6 +78,6 @@ function ProgressDashboard({
       </div>
     </div>
   )
-}
+})
 
 export default ProgressDashboard

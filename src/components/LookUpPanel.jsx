@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import './LookUpPanel.css'
 import { TYPE_CONFIG, JA_TYPE_CONFIG } from '../config/languages'
 
@@ -51,7 +52,7 @@ const TIPS = [
   { key: 'review', icon: '\uD83D\uDCDD', text: 'Review confirmed knowledge points with the quiz system' },
 ]
 
-function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en' }) {
+const LookUpPanel = memo(function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en' }) {
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
 
   if (!point) {
@@ -151,6 +152,6 @@ function LookUpPanel({ point, expandedChinese, onToggleChinese, language = 'en' 
       )}
     </div>
   )
-}
+})
 
 export default LookUpPanel

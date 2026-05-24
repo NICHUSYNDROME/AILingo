@@ -1,4 +1,5 @@
-import { getItem, removeItem, setItem } from '../utils/storage'
+import { getItem, setItem } from '../utils/storage'
+import { debug } from '../utils/debug'
 
 export const API_URL = 'https://api.deepseek.com/chat/completions'
 
@@ -77,7 +78,7 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
  */
 export function parseJSONResponse(content) {
   if (!content || typeof content !== 'string') {
-    console.warn('[parseJSONResponse] Invalid input:', content)
+    debug.warn('[parseJSONResponse] Invalid input:', content)
     return null
   }
 
@@ -114,7 +115,7 @@ export function parseJSONResponse(content) {
     }
 
     // 5. All attempts failed — log for debugging
-    console.warn('[parseJSONResponse] Failed to parse content:', content)
+    debug.warn('[parseJSONResponse] Failed to parse content:', content)
     return null
   }
 }

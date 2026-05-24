@@ -9,6 +9,8 @@
  * @param {string} lang - Language code: 'en' for English, 'ja' for Japanese
  * @returns {SpeechSynthesisVoice|null}
  */
+
+import { debug } from './debug'
 function getBestVoice(lang) {
   const voices = speechSynthesis.getVoices()
   if (voices.length === 0) return null
@@ -79,7 +81,7 @@ export function speakWord(text, language = 'en') {
       if (event.error === 'canceled' || event.error === 'interrupted') {
         resolve()
       } else {
-        console.warn('[speakWord] Speech error:', event.error)
+        debug.warn('[speakWord] Speech error:', event.error)
         reject(event)
       }
     }

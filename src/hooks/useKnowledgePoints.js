@@ -1,18 +1,25 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { getItem, setItem } from '../utils/storage'
+import { debug } from '../utils/debug'
 import { getLocalDateString } from '../utils/date'
+
+// ── Debounced persistence ────────────────────────────────────────────
+const SAVE_DELAY = 300 // ms
 
 function getStorageKey(language) {
   return language === 'ja' ? 'ja_knowledge_points' : 'en_knowledge_points'
 }
 
+/**
+ * Synchronous load from localStorage (fast first-render seed).
+ */
 function loadFromStorage(language) {
   const STORAGE_KEY = getStorageKey(language)
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const points = JSON.parse(raw)
-      console.log(`[useKnowledgePoints] 从 localStorage 加载知识点 (${STORAGE_KEY})，数量:`, points.length)
+      debug.log(`[useKnowledgePoints] 从 localStorage 加载知识点 (${STORAGE_KEY})，数量:`, points.length)
       // Data migration: ensure all old data has meaningChinese and phonetic fields
       let needsSave = false
       const migrated = points.map((p) => {
@@ -30,7 +37,7 @@ function loadFromStorage(language) {
       if (needsSave) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
-          console.log('[useKnowledgePoints] 数据迁移完成：为旧数据补充 meaningChinese/phonetic 字段')
+          debug.log('[useKnowledgePoints] 数据迁移完成：为旧数据补充 meaningChinese/phonetic 字段')
         } catch {
           // storage full — silently ignore
         }
@@ -38,28 +45,12 @@ function loadFromStorage(language) {
       return Array.isArray(migrated) ? migrated : []
     }
   } catch (e) {
-    console.error('[useKnowledgePoints] 加载知识点失败:', e)
+    debug.error('[useKnowledgePoints] 加载知识点失败:', e)
   }
   return []
 }
 
-function saveToStorage(points, language) {
-  const STORAGE_KEY = getStorageKey(language)
-  // 同步写入 localStorage（开发环境）
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(points))
-  } catch (e) {
-    console.error('[useKnowledgePoints] 保存知识点到 localStorage 失败:', e)
-  }
-  // 异步写入 Electron 存储（不等待，避免阻塞渲染）
-  setItem(STORAGE_KEY, JSON.stringify(points)).catch((e) => {
-    console.error('[useKnowledgePoints] 保存知识点到 Electron 存储失败:', e)
-  })
-  console.log(`[useKnowledgePoints] 知识点已保存 (${STORAGE_KEY})，数量:`, points.length)
-}
-
 function generateId() {
-  // Simple UUID v4
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
@@ -69,46 +60,94 @@ function generateId() {
 export function useKnowledgePoints(language = 'en') {
   const [knowledgePoints, setKnowledgePoints] = useState(() => {
     const loaded = loadFromStorage(language)
-    console.log('[useKnowledgePoints] 初始化，加载知识点数:', loaded.length)
+    debug.log('[useKnowledgePoints] 初始化，加载知识点数:', loaded.length)
     return loaded
   })
-  const [isLoading, setIsLoading] = useState(true)
-  const loadedRef = useRef(false)
 
-  // Electron 环境下，从主进程文件异步加载真实数据
+  // ── Debounced persistence ──────────────────────────────────────
+  const storageKeyRef = useRef(getStorageKey(language))
+  const saveTimerRef = useRef(null)
+  const unmountedRef = useRef(false)
+
+  /** Immediately persist current points to localStorage + schedule Electron flush */
+  const persistNow = useCallback((points) => {
+    const key = storageKeyRef.current
+    // Sync write to localStorage (instant)
+    try {
+      localStorage.setItem(key, JSON.stringify(points))
+    } catch (e) {
+      debug.error('[useKnowledgePoints] 保存到 localStorage 失败:', e)
+    }
+    // Async write to Electron (debounced via storage.js)
+    setItem(key, JSON.stringify(points)).catch((e) => {
+      debug.error('[useKnowledgePoints] 保存到 Electron 存储失败:', e)
+    })
+  }, [])
+
+  /** Schedule a debounced persist. Merges rapid mutations into one write. */
+  const schedulePersist = useCallback((points) => {
+    if (unmountedRef.current) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      persistNow(points)
+    }, SAVE_DELAY)
+  }, [persistNow])
+
+  // Flush any pending save on unmount
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+    }
+  }, [])
+
+  // Update storageKey when language changes
+  useEffect(() => {
+    storageKeyRef.current = getStorageKey(language)
+  }, [language])
+
+  // ── Load from Electron storage (safety net, avoids flicker) ────
   useEffect(() => {
     async function loadFromElectronStorage() {
-      const STORAGE_KEY = getStorageKey(language)
-      const stored = await getItem(STORAGE_KEY)
+      const key = getStorageKey(language)
+      const stored = await getItem(key)
       if (stored) {
         try {
           const parsed = JSON.parse(stored)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setKnowledgePoints(parsed)
+            // Only update state if data actually differs (avoids flicker)
+            setKnowledgePoints((prev) => {
+              if (prev.length === parsed.length) {
+                // Quick check: same length, might be same data
+                const prevIds = new Set(prev.map((p) => p.id))
+                const allMatch = parsed.every((p) => prevIds.has(p.id))
+                if (allMatch) return prev // no change, skip re-render
+              }
+              return parsed
+            })
           }
         } catch (e) {
-          console.error('[useKnowledgePoints] 从 Electron 存储加载解析失败:', e)
+          debug.error('[useKnowledgePoints] 从 Electron 存储加载解析失败:', e)
         }
       }
-      loadedRef.current = true
-      setIsLoading(false)
     }
     loadFromElectronStorage()
   }, [language])
 
   const addPoint = useCallback((data) => {
-    // Debug: log received phonetic value
-    console.log('[addPoint] Received phonetic:', data.phonetic, 'type:', data.type)
+    debug.log('[addPoint] Received phonetic:', data.phonetic, 'type:', data.type)
 
-    // === 兜底检查：如果 meaningChinese 为空或只有空白字符，不添加该知识点 ===
-    // 例外：source 为 'spelling_correction' 或 'grammar_correction' 的知识点允许跳过此检查
     const meaningChinese = (data.meaningChinese || '').trim()
     if (!meaningChinese && data.source !== 'spelling_correction' && data.source !== 'grammar_correction') {
-      console.warn(`[useKnowledgePoints] 知识点 "${data.word || 'unknown'}" 的中文释义为空，跳过添加`)
+      debug.warn(`[useKnowledgePoints] 知识点 "${data.word || 'unknown'}" 的中文释义为空，跳过添加`)
       return null
     }
 
-    // Normalize: API now returns "example" (string), but old code expects "examples" (array)
     let examples = data.examples
     if (!examples && data.example) {
       examples = [data.example]
@@ -118,16 +157,12 @@ export function useKnowledgePoints(language = 'en') {
     }
 
     const pointType = data.type || 'word'
-
-    // Phonetic only applies to word and phrase types
     let phonetic = data.phonetic || ''
     if (pointType === 'grammar' || pointType === 'collocation') {
       phonetic = ''
     }
-
-    // Warn if type is word and phonetic is empty
     if (pointType === 'word' && !phonetic) {
-      console.warn(`[addPoint] ⚠️  type is "word" but phonetic is empty for: "${data.word}"`)
+      debug.warn(`[addPoint] ⚠️  type is "word" but phonetic is empty for: "${data.word}"`)
     }
 
     const point = {
@@ -146,7 +181,7 @@ export function useKnowledgePoints(language = 'en') {
       easeFactor: 2.5,
       interval: 0,
       repetitions: 0,
-      nextReview: getLocalDateString(), // today, immediately enters review queue
+      nextReview: getLocalDateString(),
       status: 'active',
       confirmed: false,
       createdAt: new Date().toISOString(),
@@ -154,7 +189,6 @@ export function useKnowledgePoints(language = 'en') {
     let added = false
     let existingId = null
     setKnowledgePoints((prev) => {
-      // Dedup by word (lowercase + trim) — ignore type/context differences
       const normalizedWord = point.word.toLowerCase().trim()
       const existing = prev.find(
         (p) =>
@@ -162,73 +196,69 @@ export function useKnowledgePoints(language = 'en') {
           p.status !== 'deleted'
       )
       if (existing) {
-        // 对于 spelling_correction / grammar_correction 来源的重复知识点，调整掌握程度
         if (data.source === 'spelling_correction' || data.source === 'grammar_correction') {
           const updatedPoint = {
             ...existing,
             repetitions: (existing.repetitions || 0) + 0.5,
             easeFactor: Math.max(1.3, (existing.easeFactor || 2.5) - 0.1),
             nextReview: getLocalDateString(),
-            // 如果占位知识点被查词补全了，保留已补全的信息
             ...(data.meaning ? { meaning: data.meaning } : {}),
             ...(data.meaningChinese ? { meaningChinese: data.meaningChinese } : {}),
             ...(data.phonetic ? { phonetic: data.phonetic } : {}),
           }
           const updated = prev.map(p => p.id === existing.id ? updatedPoint : p)
-          saveToStorage(updated, language)
-          console.log(`[useKnowledgePoints] 知识点已存在，调整掌握程度: ${point.word} (repetitions=${updatedPoint.repetitions}, easeFactor=${updatedPoint.easeFactor})`)
+          schedulePersist(updated)
+          debug.log(`[useKnowledgePoints] 知识点已存在，调整掌握程度: ${point.word}`)
           existingId = existing.id
           return updated
         }
-        // 其他来源：原有逻辑，直接跳过
-        console.log(`[useKnowledgePoints] 知识点已存在，跳过: ${point.word}`)
+        debug.log(`[useKnowledgePoints] 知识点已存在，跳过: ${point.word}`)
         return prev
       }
       added = true
       const updated = [point, ...prev]
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 添加知识点，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 添加知识点，当前总数:', updated.length)
       return updated
     })
-    // 返回添加的知识点或其 id（用于后续更新）
     if (existingId) {
       return { id: existingId }
     }
     return added ? point : null
-  }, [language])
+  }, [schedulePersist])
 
   const deletePoint = useCallback((id) => {
     setKnowledgePoints((prev) => {
       const updated = prev.map((p) =>
         p.id === id ? { ...p, status: 'deleted' } : p
       )
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 删除知识点，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 删除知识点，当前总数:', updated.length)
       return updated
     })
-  }, [language])
+  }, [schedulePersist])
 
   const markMastered = useCallback((id) => {
     setKnowledgePoints((prev) => {
       const updated = prev.map((p) =>
         p.id === id ? { ...p, status: 'mastered' } : p
       )
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 标记已掌握，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 标记已掌握，当前总数:', updated.length)
       return updated
     })
-  }, [language])
+  }, [schedulePersist])
 
   const confirmPoint = useCallback((id) => {
     setKnowledgePoints((prev) => {
       const updated = prev.map((p) =>
         p.id === id ? { ...p, confirmed: true } : p
       )
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 确认知识点，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 确认知识点，当前总数:', updated.length)
       return updated
     })
-  }, [language])
+  }, [schedulePersist])
 
   const searchPoints = useCallback((query) => {
     if (!query.trim()) return knowledgePoints
@@ -249,7 +279,6 @@ export function useKnowledgePoints(language = 'en') {
           sorted.sort((a, b) => a.word.localeCompare(b.word))
           break
         case 'difficulty':
-          // Sort by easeFactor ascending (lower = harder to remember)
           sorted.sort((a, b) => a.easeFactor - b.easeFactor)
           break
         case 'recent':
@@ -257,11 +286,11 @@ export function useKnowledgePoints(language = 'en') {
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
           )
           break
-        case 'mastery':
-          // active first, then mastered, then deleted
+        case 'mastery': {
           const order = { active: 0, mastered: 1, deleted: 2 }
           sorted.sort((a, b) => order[a.status] - order[b.status])
           break
+        }
         default:
           break
       }
@@ -281,18 +310,6 @@ export function useKnowledgePoints(language = 'en') {
     ).length
   }, [knowledgePoints])
 
-  /**
-   * Update a knowledge point's SM-2 review data after a quiz.
-   *
-   * @param {string} id - Knowledge point ID
-   * @param {Object} reviewData - { easeFactor, interval, repetitions, nextReview }
-   */
-  /**
-   * Update a knowledge point's fields (used for async completion of meaning/phonetic etc.)
-   *
-   * @param {string} id - Knowledge point ID
-   * @param {Object} fields - Partial fields to update (e.g. { meaning, meaningChinese, phonetic })
-   */
   const updatePoint = useCallback((id, fields) => {
     setKnowledgePoints((prev) => {
       const updated = prev.map((p) =>
@@ -300,11 +317,11 @@ export function useKnowledgePoints(language = 'en') {
           ? { ...p, ...fields }
           : p
       )
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 更新知识点字段，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 更新知识点字段，当前总数:', updated.length)
       return updated
     })
-  }, [language])
+  }, [schedulePersist])
 
   const updatePointReview = useCallback((id, reviewData) => {
     setKnowledgePoints((prev) => {
@@ -319,11 +336,11 @@ export function useKnowledgePoints(language = 'en') {
             }
           : p
       )
-      saveToStorage(updated, language)
-      console.log('[useKnowledgePoints] 更新复习数据，当前总数:', updated.length)
+      schedulePersist(updated)
+      debug.log('[useKnowledgePoints] 更新复习数据，当前总数:', updated.length)
       return updated
     })
-  }, [language])
+  }, [schedulePersist])
 
   return {
     knowledgePoints,

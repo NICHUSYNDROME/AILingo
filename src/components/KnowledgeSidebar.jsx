@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
 import './KnowledgeSidebar.css'
 import { TYPE_CONFIG, JA_TYPE_CONFIG } from '../config/languages'
 
-function KnowledgeSidebar({
+const KnowledgeSidebar = memo(function KnowledgeSidebar({
   knowledgePoints,
   onDelete,
   onConfirmPoint,
@@ -236,6 +236,6 @@ function KnowledgeSidebar({
       </div>
     </div>
   )
-}
+})
 
 export default KnowledgeSidebar

@@ -2,10 +2,11 @@
  * Chat API module — conversation flow, goal generation, summary, task tracking.
  */
 
-import { getItem, removeItem } from '../utils/storage'
+import { removeItem } from '../utils/storage'
 import { API_URL, getApiKey } from './client'
 import { parseJSONResponse } from './client'
 import { buildSystemPrompt } from './prompts'
+import { debug } from '../utils/debug'
 
 /**
  * Parse AI reply to extract [CONVERSATION_ENDED], [GOAL_ACHIEVED],
@@ -81,7 +82,7 @@ export async function sendToAI(
           'Just a brief closing statement and farewell. If you ask a question, you have failed.',
       },
     ]
-    console.log('[sendToAI] 收尾轮：已追加结束指令')
+    debug.log('[sendToAI] 收尾轮：已追加结束指令')
   } else {
     messages = [
       { role: 'system', content: systemPrompt },
@@ -99,12 +100,12 @@ export async function sendToAI(
   }
 
   // Debug: log messages count and last 3 messages
-  console.log(
+  debug.log(
     `[sendToAI] Messages count: ${messages.length}, isLastRound: ${isLastRound}`
   )
   const last3 = messages.slice(-3)
   last3.forEach((m, i) => {
-    console.log(`[sendToAI] 消息 #${messages.length - 3 + i}: role=${m.role}, content="${(m.content || '').slice(0, 80)}..."`)
+    debug.log(`[sendToAI] 消息 #${messages.length - 3 + i}: role=${m.role}, content="${(m.content || '').slice(0, 80)}..."`)
   })
 
   try {
@@ -199,7 +200,7 @@ export async function generateConversationGoal(scenario, language = 'en') {
     })
 
     if (!response.ok) {
-      console.warn('[generateConversationGoal] API request failed:', response.status)
+      debug.warn('[generateConversationGoal] API request failed:', response.status)
       return ''
     }
 
@@ -207,7 +208,7 @@ export async function generateConversationGoal(scenario, language = 'en') {
     const goal = data.choices[0].message.content.trim()
     return goal
   } catch (error) {
-    console.warn('[generateConversationGoal] Failed:', error)
+    debug.warn('[generateConversationGoal] Failed:', error)
     return ''
   }
 }
@@ -274,7 +275,7 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
     },
   ]
 
-  console.log(
+  debug.log(
     `[generateSummary] Messages count: ${messages.length}, language: ${language}, generating summary...`
   )
 
@@ -398,7 +399,7 @@ export async function checkTaskCompletion(goal, todos, conversationHistory, lang
     }
     return []
   } catch (error) {
-    console.error('[checkTaskCompletion] Error:', error)
+    debug.error('[checkTaskCompletion] Error:', error)
     return []
   }
 }

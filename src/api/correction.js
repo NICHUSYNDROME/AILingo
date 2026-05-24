@@ -9,6 +9,7 @@
  */
 
 import { API_URL, getApiKey, parseJSONResponse, fetchWithTimeout } from './client'
+import { debug } from '../utils/debug'
 
 // =========================================================================
 // Agent 2A: 拼写+语法纠正专家
@@ -225,7 +226,7 @@ Please analyze spelling errors and grammar errors, and return plain text.`
   if (!response.ok) return null
   const data = await response.json()
   const result = data.choices[0].message.content
-  console.log('[2B] 输出（含拼写+语法）:', result)
+  debug.log('[2B] 输出（含拼写+语法）:', result)
   return result
 }
 
@@ -291,8 +292,8 @@ Rules:
 - A phrase ending with '?' or containing question patterns like 'can I', 'shall I', 'do you', 'would you', 'want me to' counts as a question.
 - If multiple questions, use the most direct one as triggerQuestion.`
 
-  console.log('[2C] 检测 AI 回复中的提问:', assistantReply?.slice(0, 200))
-  console.log('[2C] 是否包含问号:', assistantReply?.includes('?'))
+  debug.log('[2C] 检测 AI 回复中的提问:', assistantReply?.slice(0, 200))
+  debug.log('[2C] 是否包含问号:', assistantReply?.includes('?'))
 
   const response = await fetchWithTimeout(API_URL, {
     method: 'POST',
@@ -312,7 +313,7 @@ Rules:
   if (!response.ok) return null
   const data = await response.json()
   const result = parseJSONResponse(data.choices[0].message.content)
-  console.log('[2C] 生成结果:', JSON.stringify(result, null, 2))
+  debug.log('[2C] 生成结果:', JSON.stringify(result, null, 2))
   return result
 }
 
@@ -408,7 +409,7 @@ CRITICAL: Each individual correction MUST be a SEPARATE object in the extractedC
 
 If nothing to extract, set extractedCorrections to null.`
 
-  console.log('[2D] AI 回复:', assistantReply?.slice(0, 200))
+  debug.log('[2D] AI 回复:', assistantReply?.slice(0, 200))
 
   const response = await fetchWithTimeout(API_URL, {
     method: 'POST',
@@ -428,7 +429,7 @@ If nothing to extract, set extractedCorrections to null.`
   if (!response.ok) return null
   const data = await response.json()
   const result = parseJSONResponse(data.choices[0].message.content)
-  console.log('[2D] 提取结果:', JSON.stringify(result, null, 2))
+  debug.log('[2D] 提取结果:', JSON.stringify(result, null, 2))
   return result
 }
 
@@ -595,8 +596,8 @@ Sensitivity setting: ${sensitivity}`
   if (!response.ok) return { tips: [], knowledgePoints: [] }
   const data = await response.json()
   const parsed = parseJSONResponse(data.choices[0].message.content)
-  console.log('[2E] 从 grammarAnalysis 提取知识点:', parsed?.knowledgePoints?.length || 0, '个')
-  console.log('[2E] knowledgePoints:', JSON.stringify(parsed?.knowledgePoints, null, 2))
+  debug.log('[2E] 从 grammarAnalysis 提取知识点:', parsed?.knowledgePoints?.length || 0, '个')
+  debug.log('[2E] knowledgePoints:', JSON.stringify(parsed?.knowledgePoints, null, 2))
   return {
     tips: parsed?.tips || [],
     knowledgePoints: parsed?.knowledgePoints || []

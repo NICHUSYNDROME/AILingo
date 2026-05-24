@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getItem, removeItem } from '../utils/storage'
+import { debug } from '../utils/debug'
+import { API_URL } from '../api/client'
 import { calculateNextReview } from '../utils/sm2'
 import { logActivity } from '../utils/learningLog'
 import { getLocalDateString } from '../utils/date'
@@ -273,7 +275,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
         nextReview: p.nextReview,
       }))
 
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -322,7 +324,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
         setError('Failed to parse quiz data. Please try again.')
       }
     } catch (e) {
-      console.error('Quiz generation error:', e)
+      debug.error('Quiz generation error:', e)
       setError('Failed to generate quiz. Please try again.')
     }
     setLoading(false)
@@ -395,7 +397,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
         const apiKey = await getItem('deepseek_api_key')
         if (apiKey) {
           try {
-            const response = await fetch('https://api.deepseek.com/chat/completions', {
+            const response = await fetch(API_URL, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -500,7 +502,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       // Log quiz activity
       logActivity('quiz', questions.length, language)
     } catch (e) {
-      console.error('Quiz submission error:', e)
+      debug.error('Quiz submission error:', e)
     }
     setSubmitting(false)
   }, [questions, answers, getPointById, updatePointReview])

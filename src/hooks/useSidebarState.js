@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { getItem, removeItem } from '../utils/storage'
+import { API_URL, parseJSONResponse } from '../api/client'
 
 /**
  * Manages sidebar panel state, dictionary search, and knowledge point selection.
@@ -23,14 +24,6 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
 
   const dictSearchRef = useRef(null)
 
-  // ── JSON parsing helper ──────────────────────────────────────────
-  const parseJSONResponse = useCallback((text) => {
-    let jsonStr = text.trim()
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonMatch) jsonStr = jsonMatch[1].trim()
-    return JSON.parse(jsonStr)
-  }, [])
-
   // ── Shared dict search logic ─────────────────────────────────────
   const performDictSearch = useCallback(async (word) => {
     const apiKey = await getItem('deepseek_api_key')
@@ -40,7 +33,7 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
       return null
     }
 
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -70,11 +63,10 @@ export function useSidebarState(language, knowledgePoints, addPoint, getPointByI
     try {
       return parseJSONResponse(aiResponse)
     } catch {
-      console.error('Failed to parse AI response as JSON:', aiResponse)
       setSidebarContent({ error: 'Failed to parse word definition', raw: aiResponse })
       return null
     }
-  }, [language, getDictSystemPrompt, parseJSONResponse])
+  }, [language, getDictSystemPrompt])
 
   // ── Build knowledge point from dict result ───────────────────────
   const buildKnowledgePoint = useCallback((word, dictData) => ({

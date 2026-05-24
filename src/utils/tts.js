@@ -9,6 +9,8 @@
  * to avoid redundant API calls for the same text.
  */
 
+import { debug } from './debug'
+
 import { getItem } from './storage'
 
 const TTS_PROXY_URL = 'http://localhost:3001/tts'
@@ -80,7 +82,7 @@ export async function speak(text, language = 'en', apiKey = null) {
   }
 
   if (!apiKey) {
-    console.warn('未配置 TTS API Key，请在设置中配置千问 TTS API Key')
+    debug.warn('未配置 TTS API Key，请在设置中配置千问 TTS API Key')
     return
   }
 
@@ -136,10 +138,10 @@ export async function speak(text, language = 'en', apiKey = null) {
       audio.onerror = () => { currentAudio = null }
       await audio.play()
     } else {
-      console.error('TTS 请求失败:', data.error || data.detail)
+      debug.error('TTS 请求失败:', data.error || data.detail)
     }
   } catch (e) {
-    console.error('TTS 请求出错:', e)
+    debug.error('TTS 请求出错:', e)
   }
 }
 

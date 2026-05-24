@@ -1,18 +1,80 @@
 /**
- * AILingo 持久化存储模块
- * - 开发模式（浏览器）：使用 localStorage
- * - 生产模式（Electron）：使用 window.electronAPI 读写本地文件
+ * AILingo 持久化存储模块（优化版）
+ *
+ * 策略：
+ * - localStorage 始终作为主存储（同步读写，零延迟）
+ * - Electron 环境下，将 localStorage 变更异步防抖批量同步到本地文件
+ * - 内存缓存避免每次写入都 readSettings（读取全量文件）
+ *
+ * 模式：
+ * - 浏览器：只使用 localStorage
+ * - Electron：localStorage + 防抖同步到文件（300ms 合并窗口）
  */
+
+import { debug } from './debug'
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI;
 
-export async function getItem(key) {
-  if (isElectron) {
+// ── Electron 内存缓存 + 防抖 ────────────────────────────────────────
+let _electronCache = null;
+let _electronCacheLoaded = false;
+let _flushTimer = null;
+const FLUSH_DELAY = 300; // ms，同一帧内的多次写入合并为一次文件写入
+
+/** 延迟加载并缓存 Electron 文件内容 */
+async function _ensureElectronCache() {
+  if (!isElectron) return null;
+  if (!_electronCacheLoaded) {
     try {
-      const settings = await window.electronAPI.readSettings();
-      return settings[key] || null;
+      _electronCache = await window.electronAPI.readSettings();
     } catch {
-      return null;
+      _electronCache = {};
+    }
+    _electronCacheLoaded = true;
+  }
+  return _electronCache;
+}
+
+/** 安排防抖刷新：多次调用在 FLUSH_DELAY 内只触发一次 writeSettings */
+function _scheduleFlush() {
+  if (!isElectron) return;
+  if (_flushTimer) clearTimeout(_flushTimer);
+  _flushTimer = setTimeout(() => {
+    _flushTimer = null;
+    _doFlush();
+  }, FLUSH_DELAY);
+}
+
+/** 立即将缓存写入 Electron 文件（内部使用，通常由防抖调用） */
+async function _doFlush() {
+  if (!isElectron || !_electronCacheLoaded) return;
+  try {
+    await window.electronAPI.writeSettings(_electronCache);
+  } catch {
+    // 静默失败，localStorage 已保存
+  }
+}
+
+/**
+ * 强制立即刷新所有待写入的 Electron 数据。
+ * 用于应用退出前或关键操作后确保数据已持久化。
+ */
+export async function flushAll() {
+  if (_flushTimer) {
+    clearTimeout(_flushTimer);
+    _flushTimer = null;
+    await _doFlush();
+  }
+}
+
+// ── 公共 API ─────────────────────────────────────────────────────────
+
+export async function getItem(key) {
+  // 优先从 Electron 缓存读取（确保与文件一致）
+  if (isElectron) {
+    const cache = await _ensureElectronCache();
+    if (cache && key in cache) {
+      return cache[key];
     }
   }
   // 降级：localStorage
@@ -20,42 +82,34 @@ export async function getItem(key) {
 }
 
 export async function setItem(key, value) {
-  // 始终写入 localStorage（浏览器 & Electron 双写，确保数据互通）
+  // 始终同步写 localStorage（主存储，即时生效）
   localStorage.setItem(key, value);
 
+  // Electron：更新内存缓存 + 安排防抖写入文件
   if (isElectron) {
-    try {
-      const settings = await window.electronAPI.readSettings();
-      settings[key] = value;
-      await window.electronAPI.writeSettings(settings);
-    } catch {
-      // Electron 写入失败，localStorage 已保存，不影响使用
+    const cache = await _ensureElectronCache();
+    if (cache) {
+      cache[key] = value;
+      _scheduleFlush();
     }
   }
 }
 
 export async function removeItem(key) {
-  // 始终从 localStorage 移除
   localStorage.removeItem(key);
 
   if (isElectron) {
-    try {
-      const settings = await window.electronAPI.readSettings();
-      delete settings[key];
-      await window.electronAPI.writeSettings(settings);
-    } catch {
-      // Electron 删除失败，不影响使用
+    const cache = await _ensureElectronCache();
+    if (cache) {
+      delete cache[key];
+      _scheduleFlush();
     }
   }
 }
 
 /**
- * 将 Electron 文件存储中的所有数据同步到 localStorage。
- * 在应用启动时调用一次，确保浏览器开发模式与 Electron 模式数据互通。
- *
- * 调用时机：
- * - Electron 环境：应用启动时自动调用
- * - 浏览器环境：无需调用（没有 Electron 数据源）
+ * 将 Electron 文件存储同步到 localStorage + 内存缓存。
+ * 应用启动时调用一次。
  *
  * @returns {Promise<number>} 同步的数据项数量
  */
@@ -63,15 +117,18 @@ export async function syncAllFromFile() {
   if (!isElectron) return 0;
 
   try {
-    const settings = await window.electronAPI.readSettings();
-    const keys = Object.keys(settings);
+    // 读取文件并填充缓存
+    _electronCache = await window.electronAPI.readSettings();
+    _electronCacheLoaded = true;
+
+    const keys = Object.keys(_electronCache);
     for (const key of keys) {
-      localStorage.setItem(key, settings[key]);
+      localStorage.setItem(key, _electronCache[key]);
     }
-    console.log(`[storage] 已从 Electron 文件同步 ${keys.length} 项数据到 localStorage`);
+    debug.log(`[storage] 已从 Electron 文件同步 ${keys.length} 项数据到 localStorage`);
     return keys.length;
   } catch (e) {
-    console.warn('[storage] 从 Electron 文件同步失败:', e);
+    debug.warn('[storage] 从 Electron 文件同步失败:', e);
     return 0;
   }
 }

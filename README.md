@@ -122,7 +122,7 @@ npm run release -- --skip-build
 # 直接双击即可运行
 ```
 
-# 数据互通说明
+# 数据互通与持久化说明
 
 切换 Electron ⇄ 浏览器模式时，App 启动自动执行以下同步流程：
 
@@ -133,6 +133,9 @@ Electron 文件存储 ──→ localStorage  ──→ 浏览器模式读取
 
 所有用户数据（API Key、知识点、学习日志、偏好设置）始终通过 localStorage 互通，
 无需在浏览器开发模式下重复输入 API Key。
+
+> **性能优化**：Electron 写入采用内存缓存 + 300ms 防抖批量刷新，
+> 高频知识点更新（如连续确认多个知识点）自动合并为单次文件写入。
 
 ### 配置 API Key
 
@@ -178,7 +181,8 @@ english-ai-learn/
 │
 └── src/                                # 前端源码
     ├── main.jsx                        # 应用入口，挂载 Provider
-    ├── App.jsx                         # 主应用组件（~426 行，经状态重构精简）
+    ├── App.jsx                         # 容器组件（状态管理，~150 行）
+    ├── AppView.jsx                     # 视图组件（纯展示，memo 优化子面板）
     ├── App.css                         # 主应用样式
     ├── index.css                       # 全局样式（主题变量）
     │
@@ -192,7 +196,8 @@ english-ai-learn/
     │   └── client.test.js              # parseJSONResponse 单元测试
     │
     ├── config/
-    │   └── languages.js                # 语言配置（场景、UI 文本、类型样式）
+    │   ├── languages.js                # 语言配置（场景、UI 文本、类型样式）
+    │   └── prompts.js                  # 词典查词 System Prompt（英/日）
     │
     ├── context/
     │   ├── LanguageContext.jsx          # 语言上下文（中/英 UI）
@@ -204,9 +209,10 @@ english-ai-learn/
     │   └── useSidebarState.js           # 侧边栏 + 词典搜索 + 快捷键
     │
     ├── utils/
+    │   ├── debug.js                   # 统一调试模块（生产环境自动 tree-shake log/warn）
     │   ├── sm2.js                      # SM-2 间隔重复算法
     │   ├── sm2.test.js                 # SM-2 算法单元测试
-    │   ├── storage.js                  # 持久化存储（localStorage + Electron 文件双写）
+    │   ├── storage.js                  # 持久化存储（localStorage + Electron 缓存防抖双写）
     │   ├── speech.js                   # Web Speech API 本地语音合成
     │   ├── tts.js                      # TTS 客户端（缓存 + 打断控制）
     │   ├── learningLog.js              # 学习日志（活动记录 + 统计）
@@ -242,6 +248,21 @@ english-ai-learn/
         │
         └── QuizPanel.jsx               # 智能测验系统
 ```
+
+---
+
+## 架构优化（2025.05）
+
+项目已完成以下优化，提升渲染性能、存储效率和代码可维护性：
+
+| 优化项 | 说明 |
+|--------|------|
+| **组件拆分** | `App.jsx` 拆为容器（状态管理） + `AppView.jsx`（纯展示），`CenterPanel`/`RightSidebar`/`HeaderRight`/`KnowledgeSidebar` 均 `React.memo` 包裹 |
+| **存储防抖** | `storage.js` 新增内存缓存 + 300ms 防抖批量写 Electron 文件，避免高频知识点操作导致大量 I/O |
+| **渲染闪烁消除** | `useKnowledgePoints` Electron 加载时对比数据 ID，相同时跳过 `setState` |
+| **重复代码清理** | 删除 `api.js.bak`（737 行废弃备份），`useSidebarState` 改为复用共享 `parseJSONResponse`，`QuizPanel` 硬编码 URL 统一为 `API_URL` |
+| **调试日志优化** | 全项目 139+ 处 `console.log/warn` 替换为 `debug` 模块，生产构建自动 tree-shake（0 字节开销），`console.error` 保留 |
+| **打包体积** | 主包从 273.56 kB 降至 271.49 kB |
 
 ---
 

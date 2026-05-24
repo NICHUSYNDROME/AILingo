@@ -6,7 +6,7 @@
  * statistics dashboard.
  */
 
-import { getItem, setItem } from './storage'
+import { setItem } from './storage'
 
 function getStorageKey(language) {
   return language === 'ja' ? 'ja_learning_log' : 'en_learning_log'
@@ -40,18 +40,24 @@ export function loadLog(language = 'en') {
 
 /**
  * Save the full learning log to both localStorage and Electron storage.
+ *
+ * Uses the unified storage module: writes to localStorage synchronously
+ * and schedules a debounced Electron file flush.
+ *
  * @param {Object} log - The log object
  * @param {string} [language='en'] - Language key ('en' | 'ja')
  */
 export function saveLog(log, language = 'en') {
   const STORAGE_KEY = getStorageKey(language)
+  const json = JSON.stringify(log)
+  // localStorage: always write synchronously for immediate availability
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(log))
+    localStorage.setItem(STORAGE_KEY, json)
   } catch {
     // storage full — silently ignore
   }
-  // 异步写入 Electron 存储
-  setItem(STORAGE_KEY, JSON.stringify(log)).catch(() => {})
+  // Electron: async debounced flush (storage.js handles dedup + batching)
+  setItem(STORAGE_KEY, json).catch(() => {})
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getItem, setItem } from '../utils/storage'
+import { debug } from '../utils/debug'
 import { testDeepSeekKey, testTTSKey } from '../api'
 import './ApiKeyModal.css'
 
@@ -39,28 +40,28 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
   useEffect(() => {
     const loadSavedKeys = async () => {
       const savedDeepseek = await getItem('deepseek_api_key')
-      console.log('[ApiKeyModal] getItem deepseek_api_key:', savedDeepseek)
+      debug.log('[ApiKeyModal] getItem deepseek_api_key:', savedDeepseek)
       if (savedDeepseek) {
         originalDeepseekKeyRef.current = savedDeepseek
         const maskedDeepseek = maskApiKey(savedDeepseek)
         setDeepseekKey(maskedDeepseek)
-        console.log('[ApiKeyModal] masked deepseek:', maskedDeepseek)
-        console.log('[ApiKeyModal] deepseekKey state after set:', maskedDeepseek)
+        debug.log('[ApiKeyModal] masked deepseek:', maskedDeepseek)
+        debug.log('[ApiKeyModal] deepseekKey state after set:', maskedDeepseek)
         setHasExistingDeepseek(true)
       }
 
       const savedTTS = await getItem('qwen_tts_api_key')
-      console.log('[ApiKeyModal] getItem qwen_tts_api_key:', savedTTS)
+      debug.log('[ApiKeyModal] getItem qwen_tts_api_key:', savedTTS)
       if (savedTTS) {
         originalTTSKeyRef.current = savedTTS
         const maskedTTS = maskApiKey(savedTTS)
         setTtsKey(maskedTTS)
-        console.log('[ApiKeyModal] masked tts:', maskedTTS)
-        console.log('[ApiKeyModal] ttsKey state after set:', maskedTTS)
+        debug.log('[ApiKeyModal] masked tts:', maskedTTS)
+        debug.log('[ApiKeyModal] ttsKey state after set:', maskedTTS)
         setHasExistingTTS(true)
       }
 
-      console.log('[ApiKeyModal] loadSavedKeys finished, deepseekKey will be:', maskApiKey(savedDeepseek || ''))
+      debug.log('[ApiKeyModal] loadSavedKeys finished, deepseekKey will be:', maskApiKey(savedDeepseek || ''))
     }
 
     loadSavedKeys()
@@ -119,7 +120,7 @@ export default function ApiKeyModal({ mode = 'welcome', onComplete, onClose }) {
         setHasExistingTTS(true)
       } else {
         // TTS 失败仅提示，不阻塞流程
-        console.warn('TTS Key 测试失败:', ttsResult.error)
+        debug.warn('TTS Key 测试失败:', ttsResult.error)
       }
     }
 

@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, memo } from 'react'
 import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
 import './ScenarioSetup.css'
 
-function ScenarioSetup({
+const ScenarioSetup = memo(function ScenarioSetup({
   language,
   uiText,
   scenario,
@@ -312,6 +312,6 @@ function ScenarioSetup({
       )}
     </div>
   )
-}
+})
 
 export default ScenarioSetup
