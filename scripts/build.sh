@@ -209,6 +209,7 @@ cp package.json "release/AILingo.app/Contents/Resources/app/"
 log_info "复制 TTS 服务器..."
 mkdir -p "release/AILingo.app/Contents/Resources/app/server"
 cp server/tts-server.cjs "release/AILingo.app/Contents/Resources/app/server/"
+cp server/tts-proxy.cjs "release/AILingo.app/Contents/Resources/app/server/"
 
 log_info "创建 Info.plist..."
 cat > "release/AILingo.app/Contents/Info.plist" << 'PLISTEOF'

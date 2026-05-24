@@ -65,7 +65,7 @@ function createWindow() {
  * Start the TTS proxy server embedded in the Electron main process.
  * Uses the shared tts-proxy.cjs module.
  */
-function startTTSServer() {
+function initTTSServer() {
   ttsServer = startTTSServer(3001, { logPrefix: 'AILingo' });
 }
 
@@ -125,7 +125,7 @@ app.whenReady().then(() => {
   createWindow();
 
   if (!isDev) {
-    startTTSServer();
+    initTTSServer();
   }
 
   app.on('activate', () => {
