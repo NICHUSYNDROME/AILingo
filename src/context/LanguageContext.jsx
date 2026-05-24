@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getItem, setItem } from '../utils/storage'
-import { UI_TEXT } from '../config/languages'
 
 const STORAGE_KEY = 'app_language'
 
 const LanguageContext = createContext(null)
 
 export function LanguageProvider({ children }) {
+  const { i18n } = useTranslation()
   const [language, setLanguageState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -27,6 +28,11 @@ export function LanguageProvider({ children }) {
     loadFromStorage()
   }, [])
 
+  // Sync language to i18next whenever it changes
+  useEffect(() => {
+    i18n.changeLanguage(language)
+  }, [language, i18n])
+
   const setLanguage = useCallback((lang) => {
     setLanguageState(lang)
     try {
@@ -37,11 +43,9 @@ export function LanguageProvider({ children }) {
     }
   }, [])
 
-  const uiText = useMemo(() => UI_TEXT[language] || UI_TEXT.en, [language])
-
   const value = useMemo(
-    () => ({ language, setLanguage, uiText }),
-    [language, setLanguage, uiText]
+    () => ({ language, setLanguage }),
+    [language, setLanguage]
   )
 
   return (
