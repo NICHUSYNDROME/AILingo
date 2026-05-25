@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LANGUAGES } from '../config/languages'
 import './SettingsPanel.css'
@@ -14,8 +14,19 @@ const SettingsPanel = memo(function SettingsPanel({
   setTheme,
   autoReadAloud,
   setAutoReadAloud,
+  onClearProficiency,
+  onClearKnowledge,
+  onOpenApiSettings,
 }) {
   const { t } = useTranslation()
+  const [confirmAction, setConfirmAction] = useState(null) // 'proficiency' | 'knowledge' | null
+
+  const handleConfirm = useCallback(() => {
+    if (confirmAction === 'proficiency') onClearProficiency?.()
+    else if (confirmAction === 'knowledge') onClearKnowledge?.()
+    setConfirmAction(null)
+  }, [confirmAction, onClearProficiency, onClearKnowledge])
+
   if (!open) return null
 
   return (
@@ -102,8 +113,55 @@ const SettingsPanel = memo(function SettingsPanel({
               </button>
             </div>
           </div>
+
+          {/* Danger zone */}
+          <div className="settings-group settings-group-danger">
+            <label className="settings-label">{t('settingsDataManagement')}</label>
+            <button
+              className="settings-danger-btn"
+              onClick={() => setConfirmAction('proficiency')}
+            >
+              {t('settingsClearProficiency')}
+            </button>
+            <button
+              className="settings-danger-btn"
+              onClick={() => setConfirmAction('knowledge')}
+            >
+              {t('settingsClearKnowledge')}
+            </button>
+          </div>
+
+          {/* API settings */}
+          <div className="settings-group">
+            <label className="settings-label">{t('settingsApiSettings')}</label>
+            <button
+              className="settings-action-btn"
+              onClick={onOpenApiSettings}
+            >
+              {t('settingsManageApiKey')}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Confirmation dialog — rendered outside panel for proper z-index */}
+      {confirmAction && (
+        <>
+          <div className="settings-confirm-backdrop" onClick={() => setConfirmAction(null)} />
+          <div className="settings-confirm-dialog">
+            <div className="settings-confirm-title">确认清除</div>
+            <div className="settings-confirm-body">
+              {confirmAction === 'proficiency'
+                ? '确定要清除当前语言的水平评估结果吗？这不会影响已保存的知识点记录。'
+                : '确定要清除当前语言的所有知识点记录吗？此操作不可撤销。'}
+            </div>
+            <div className="settings-confirm-actions">
+              <button className="settings-confirm-cancel" onClick={() => setConfirmAction(null)}>取消</button>
+              <button className="settings-confirm-ok" onClick={handleConfirm}>确认清除</button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   )
 })

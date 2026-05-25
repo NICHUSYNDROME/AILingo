@@ -358,6 +358,7 @@ export async function extractCorrectionsFromReply(assistantReply, language = 'en
 6. 「小さなヒント：...」「ヒント：...」で始まる文
 7. ユーザーの間違いを直接指摘し、正しい形を提案する文
 8. 会話の流れを中断する教育的な補足説明
+9. 「（動作説明）」のような舞台指示・内心描写 — 括弧内が動作や状況を表す文は完全に除去
 
 重要: 学習アドバイスを含む文全体（または節）を除去してください。ただし、前後の対話内容が自然につながるように注意してください。
 
@@ -396,6 +397,7 @@ Identify and REMOVE entire sentences or clauses that match these patterns:
 7. "a better way to say that is X"
 8. Any sentence that directly corrects the user's mistake and suggests the correct form
 9. Any teaching interruption that breaks the natural flow of conversation
+10. Stage directions / inner thoughts in parentheses — e.g. "(places the water)" or "（动作描述）" — remove these entirely
 
 IMPORTANT: Remove the ENTIRE sentence or clause containing the teaching advice. Ensure the remaining dialogue still flows naturally.
 

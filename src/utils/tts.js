@@ -22,6 +22,23 @@ const MAX_CACHE_SIZE = 50
 let currentAudio = null
 
 /**
+ * Strip Japanese furigana (ruby readings) and stage directions from text.
+ * - 漢字（かんじ）→ 漢字  (furigana removal)
+ * - （舞台指示）→ removed  (stage direction removal)
+ * Preserves non-reading parentheses like （笑）or （汗）which are single-kana emotes.
+ */
+export function cleanTtsText(text) {
+  if (!text) return ''
+  // Remove stage directions: parenthesized action descriptions (multi-kana or kanji inside)
+  let cleaned = text.replace(/（[^）]{2,}）|（[^\u3040-\u309f\u30a0-\u30ff）]{2,}）/g, '')
+  // Remove furigana: kanji immediately followed by kana in parens
+  cleaned = cleaned.replace(/([\u4e00-\u9fff\u3400-\u4dbf]+)（[\u3040-\u309f\u30a0-\u30ff]+）/g, '$1')
+  // Clean up double spaces
+  cleaned = cleaned.replace(/  +/g, ' ').trim()
+  return cleaned
+}
+
+/**
  * Check if TTS is available (always true for proxy-based approach).
  * @returns {boolean}
  */
@@ -86,13 +103,15 @@ export async function speak(text, language = 'en', apiKey = null) {
     return
   }
 
-  // Voice — qwen3-tts-instruct-flash supports: Cherry, Serena, Ethan, Chelsie, Ryan
-  // Ryan is a male voice
+  // Strip furigana and stage directions before TTS
+  const cleanText = cleanTtsText(text)
+  if (!cleanText) return
+
   const voice = 'Kai'
   const languageType = language === 'ja' ? 'Japanese' : 'English'
 
   // Generate cache key (truncate text to 100 chars to avoid excessively long keys)
-  const cacheKey = `${language}_${voice}_${text.slice(0, 100)}`
+  const cacheKey = `${language}_${voice}_${cleanText.slice(0, 100)}`
 
   // Check cache first
   const cachedUrl = audioCache.get(cacheKey)
@@ -110,7 +129,7 @@ export async function speak(text, language = 'en', apiKey = null) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text,
+        text: cleanText,
         apiKey,
         voice,
         languageType,

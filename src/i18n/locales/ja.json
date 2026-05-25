@@ -101,6 +101,11 @@
   "settingsFollowSystem": "システム設定に従う",
   "settingsDarkMode": "ダークモード",
   "settingsAutoRead": "AIの返信を自動読み上げ",
+  "settingsDataManagement": "⚙️ データ管理",
+  "settingsClearProficiency": "レベル評価結果を消去",
+  "settingsClearKnowledge": "単語帳を消去",
+  "settingsApiSettings": "🔑 API設定",
+  "settingsManageApiKey": "APIキーを管理",
   "on": "オン",
   "off": "オフ",
   "loadingConversation": "会話を読み込み中…",
@@ -151,5 +156,10 @@
   "testingDeepseek": "DeepSeek API Key をテスト中...",
   "deepseekInvalid": "DeepSeek Key が無効です：",
   "testingTTS": "Qwen TTS API Key をテスト中...",
-  "deepseekSuccess": "DeepSeek API Key の検証に成功しました！"
+  "deepseekSuccess": "DeepSeek API Key の検証に成功しました！",
+
+  "assessmentBannerTitle": "ようこそ！まずはレベルを診断しましょう",
+  "assessmentBannerDesc": "8〜10往復の短い会話であなたの現在の日本語力を評価します。回答に応じて質問を調整します。",
+  "assessmentStart": "診断を始める",
+  "assessmentSkip": "スキップ (Lv.3)"
 }

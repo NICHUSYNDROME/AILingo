@@ -101,6 +101,11 @@
   "settingsFollowSystem": "Follow System",
   "settingsDarkMode": "Dark Mode",
   "settingsAutoRead": "Auto-read AI Replies",
+  "settingsDataManagement": "⚙️ Data Management",
+  "settingsClearProficiency": "Clear Proficiency Results",
+  "settingsClearKnowledge": "Clear Knowledge Points",
+  "settingsApiSettings": "🔑 API Settings",
+  "settingsManageApiKey": "Manage API Key",
   "on": "On",
   "off": "Off",
   "loadingConversation": "Loading conversation…",
@@ -155,5 +160,10 @@
   "testingDeepseek": "Testing DeepSeek API Key...",
   "deepseekInvalid": "DeepSeek Key is invalid: ",
   "testingTTS": "Testing Qwen TTS API Key...",
-  "deepseekSuccess": "DeepSeek API Key verified successfully!"
+  "deepseekSuccess": "DeepSeek API Key verified successfully!",
+
+  "assessmentBannerTitle": "Welcome! Let's discover your level first",
+  "assessmentBannerDesc": "A short 8-10 turn conversation to understand your current proficiency. We'll adapt questions based on your responses.",
+  "assessmentStart": "Start Assessment",
+  "assessmentSkip": "Skip (Lv.3)"
 }

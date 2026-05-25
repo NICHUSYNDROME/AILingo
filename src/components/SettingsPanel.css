@@ -179,3 +179,126 @@
 .settings-toggle-on .settings-toggle-thumb {
   transform: translateX(20px);
 }
+
+/* Danger zone */
+.settings-group-danger {
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
+.settings-danger-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--error-border, #ffccc7);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--error-color, #ff4d4f);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.settings-danger-btn:hover {
+  background: var(--error-bg, #fff2f0);
+  border-color: var(--error-color, #ff4d4f);
+}
+
+.settings-action-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.settings-action-btn:hover {
+  background: var(--hover-bg, #f5f5f5);
+  border-color: var(--accent-blue);
+}
+
+/* Confirmation dialog — rendered outside panel, viewport-centered */
+.settings-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 3000;
+  animation: settings-fade-in 0.15s ease;
+}
+
+.settings-confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  width: 360px;
+  max-width: 90vw;
+  z-index: 3001;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  animation: settings-fade-in 0.15s ease;
+}
+
+.settings-confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.settings-confirm-body {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.settings-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.settings-confirm-cancel {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-confirm-cancel:hover {
+  border-color: var(--text-tertiary);
+}
+
+.settings-confirm-ok {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--error-color, #ff4d4f);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.settings-confirm-ok:hover {
+  opacity: 0.9;
+}
