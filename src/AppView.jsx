@@ -50,6 +50,11 @@ const CenterPanel = memo(function CenterPanel(props) {
     isNarrow,
     activeTab,
     setActiveTab,
+    isFirstTime,
+    handleStartAssessment,
+    handleSkipAssessment,
+    handleAssessmentEnd,
+    setProficiencyScore,
   } = props
 
   switch (centerState) {
@@ -79,8 +84,11 @@ const CenterPanel = memo(function CenterPanel(props) {
                 onTargetKnowledgeChange={setTargetKnowledge}
                 onStartChat={handleStartChat}
                 generateGoal={handleGenerateGoal}
-              />
-            )}
+                isFirstTime={isFirstTime}
+                onStartAssessment={handleStartAssessment}
+                onSkipAssessment={() => handleSkipAssessment()}
+                proficiencyScore={props.proficiencyScore}
+              />)}
             {activeTab === 'review' && (
               <ProgressDashboard
                 language={language}
@@ -126,6 +134,30 @@ const CenterPanel = memo(function CenterPanel(props) {
             onAddKnowledgePoint={addPoint}
             onUpdatePoint={updatePoint}
             knowledgePoints={knowledgePoints}
+            onProficiencyChange={props.setProficiencyScore}
+          />
+        </Suspense>
+      )
+
+    case 'assessment':
+      return (
+        <Suspense fallback={<div className="center-loading">{t('loadingConversation')}</div>}>
+          <ChatArea
+            key={conversationKey}
+            language={language}
+            isNarrow={isNarrow}
+            isChatStarted={true}
+            conversationContextRef={conversationContextRef}
+            onSidebarUpdate={handleSidebarUpdate}
+            onReset={handleAssessmentEnd}
+            onDictSearchFromSelection={handleDictSearchFromSelection}
+            getConfirmedCount={getConfirmedCount}
+            targetKnowledge={0}
+            isMuted={isMuted}
+            onAddKnowledgePoint={addPoint}
+            onUpdatePoint={updatePoint}
+            knowledgePoints={knowledgePoints}
+            onProficiencyChange={setProficiencyScore}
           />
         </Suspense>
       )
@@ -360,6 +392,9 @@ function AppView(props) {
             setTheme={setTheme}
             autoReadAloud={autoReadAloud}
             setAutoReadAloud={(v) => setIsMuted(!v)}
+            onClearProficiency={props.onClearProficiency}
+            onClearKnowledge={props.onClearKnowledge}
+            onOpenApiSettings={() => { setSettingsOpen(false); setShowApiModal(true); }}
           />
         }
       />

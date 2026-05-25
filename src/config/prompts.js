@@ -3,6 +3,8 @@
  * Extracted from App.jsx to reduce component size and support lazy loading.
  */
 
+import { getKnowledgeProficiencyScoringGuide } from './proficiency'
+
 export function getDictSystemPrompt(language) {
   if (language === 'ja') {
     return `You are a Japanese dictionary assistant. Return ONLY valid JSON in the following format, no other text:
@@ -14,7 +16,8 @@ export function getDictSystemPrompt(language) {
   "definition": "Japanese definition (日本語での定義)",
   "meaningChinese": "中文释义 (required, must not be empty)",
   "phonetic": "読み仮名 (e.g., れすとらん, たべる)",
-  "examples": ["example sentence 1 in Japanese", "example sentence 2 in Japanese"]
+  "examples": ["example sentence 1 in Japanese", "example sentence 2 in Japanese"],
+  "proficiency": 4.5
 }
 
 Rules:
@@ -25,6 +28,8 @@ Rules:
 - meaningChinese: Chinese translation/explanation of the word. Must be a valid non-empty string. Use concise Chinese to explain the word's meaning.
 - phonetic: REQUIRED. Provide 読み仮名 (hiragana reading) for the word. Format like れすとらん, たべる. Never leave this empty.
 - examples: array of 1-2 example sentences in Japanese
+- proficiency: A decimal 1.00-10.00 representing the threshold at which a learner typically knows this word.
+${getKnowledgeProficiencyScoringGuide(language)}
 - DO NOT add any text outside the JSON
 - Use double quotes only
 - meaningChinese is required, do not leave it empty
@@ -40,7 +45,8 @@ Rules:
   "definition": "clear English definition",
   "meaningChinese": "中文释义 (required, must not be empty)",
   "phonetic": "IPA phonetic transcription (e.g., /ˈrestərɒnt/)",
-  "examples": ["example sentence 1", "example sentence 2"]
+  "examples": ["example sentence 1", "example sentence 2"],
+  "proficiency": 4.5
 }
 
 Rules:
@@ -51,6 +57,8 @@ Rules:
 - meaningChinese: Chinese translation/explanation of the word. Must be a valid non-empty string. Use concise Chinese to explain the word's meaning in the given context.
 - phonetic: REQUIRED. Provide IPA phonetic transcription for the word. Format like /wɜːrd/ or /fəˈnetɪk/. Never leave this empty.
 - examples: array of 1-2 example sentences
+- proficiency: A decimal 1.00-10.00 representing the threshold at which a learner typically knows this word.
+${getKnowledgeProficiencyScoringGuide(language)}
 - DO NOT add any text outside the JSON
 - Use double quotes only
 - meaningChinese is required, do not leave it empty

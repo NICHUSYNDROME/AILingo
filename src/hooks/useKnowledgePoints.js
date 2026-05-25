@@ -19,6 +19,7 @@ function loadFromStorage(language) {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const points = JSON.parse(raw)
+      if (!Array.isArray(points)) return []
       debug.log(`[useKnowledgePoints] 从 localStorage 加载知识点 (${STORAGE_KEY})，数量:`, points.length)
       // Data migration: ensure all old data has meaningChinese and phonetic fields
       let needsSave = false
@@ -69,17 +70,18 @@ export function useKnowledgePoints(language = 'en') {
   const saveTimerRef = useRef(null)
   const unmountedRef = useRef(false)
 
-  /** Immediately persist current points to localStorage + schedule Electron flush */
+  /** Immediately persist current points to localStorage + schedule Electron flush.
+   *  Only confirmed (kept) points are persisted; unconfirmed and deleted are discarded. */
   const persistNow = useCallback((points) => {
     const key = storageKeyRef.current
-    // Sync write to localStorage (instant)
+    const confirmed = points.filter(p => p.confirmed === true && p.status !== 'deleted')
     try {
-      localStorage.setItem(key, JSON.stringify(points))
+      localStorage.setItem(key, JSON.stringify(confirmed))
     } catch (e) {
       debug.error('[useKnowledgePoints] 保存到 localStorage 失败:', e)
     }
     // Async write to Electron (debounced via storage.js)
-    setItem(key, JSON.stringify(points)).catch((e) => {
+    setItem(key, JSON.stringify(confirmed)).catch((e) => {
       debug.error('[useKnowledgePoints] 保存到 Electron 存储失败:', e)
     })
   }, [])

@@ -6,6 +6,8 @@
  * for prompt format — changing a rule updates both languages.
  */
 
+import { getProficiencyGuidance, getAssessmentSystemPrompt } from '../config/proficiency'
+
 // ── i18n strings (only the parts that differ by language) ────────────────
 const L = {
   en: {
@@ -43,6 +45,7 @@ const L = {
       'NO tags — [correction], [sidebar], [GOAL_ACHIEVED], etc. Plain text only.',
       'If the user makes a mistake, naturally model the correct form (e.g. "Oh, you went to the restaurant? How was it?"). Do NOT explicitly correct.',
       'When conversation reaches the final round or user signals ending: NO questions, NO new topics, NO offers. Just a brief closing.',
+      'NO stage directions, inner thoughts, or action descriptions in parentheses like "(places the drink)" or "（水を置く）". You are a conversation partner, not a narrator.',
     ],
     goalPrefix: 'Conversation Goal (background reference): ',
     scenarioMap: { restaurant: 'Restaurant Ordering', hotel: 'Hotel Check-in', business: 'Business Meeting', casual: 'Casual Chat' },
@@ -82,6 +85,7 @@ const L = {
       '[correction], [sidebar], [GOAL_ACHIEVED] などのタグを一切使用しない。プレーンテキストのみ。',
       'ユーザーが間違えた場合、自然に正しい形をモデル提示（例「あ、レストランに行ったんですね」）。明示的に指摘しない。',
       '会話が最終ラウンドに達した場合/ユーザーが終了を合図: 質問しない、新しい話題を出さない、簡潔な締めくくりのみ。',
+      '「（水を置く）」のような舞台指示や内心描写を絶対に入れないでください。あなたは会話相手であり、ナレーターではありません。',
     ],
     goalPrefix: '会話の目標（背景参照用）: ',
     scenarioMap: { restaurant: 'レストラン注文', hotel: 'ホテルチェックイン', business: 'ビジネス会議', casual: 'カジュアル会話' },
@@ -89,13 +93,19 @@ const L = {
 }
 
 // ── Parameterized template (shared structure, localized strings) ─────────
-function buildPrompt(ctx, t) {
+function buildPrompt(ctx, t, proficiencyScore = null) {
   const scenarioName = t.scenarioMap[ctx.scenario] || ctx.scenario || 'Custom'
   const sensitivityDesc = t.sensitivity[ctx.sensitivity] || t.sensitivity.normal
   const goalLine = ctx.goal ? `${t.goalPrefix}${ctx.goal}` : ''
 
+  const lang = ctx.language || 'en'
+  const profGuidance = proficiencyScore !== null
+    ? getProficiencyGuidance(proficiencyScore, lang)
+    : null
+
   const parts = [
     t.role, '',
+    ...(profGuidance ? [profGuidance, ''] : []),
     'Personality:', ...t.personality.map(s => `- ${s}`), '',
     'Conversation Style:', ...t.style.map(s => `- ${s}`), '',
     `${t.scenarioLabel}: ${scenarioName}`,
@@ -112,14 +122,19 @@ function buildPrompt(ctx, t) {
 }
 
 // ── Public API ───────────────────────────────────────────────────────────
-export function buildSystemPrompt(ctx, language = 'en') {
+export function buildSystemPrompt(ctx, language = 'en', proficiencyScore = null) {
   if (!ctx) {
     return language === 'ja'
       ? 'あなたは親切な日本語学習アシスタントです。会話はすべて日本語で行います。'
       : '你是一个友好的英语学习助手。对话全部使用英语。仅在解释语法或生词时短暂使用中文。'
   }
 
+  // Assessment mode: use the dedicated assessment system prompt
+  if (ctx.isAssessment) {
+    return getAssessmentSystemPrompt(language)
+  }
+
   const t = L[language] || L.en
-  return buildPrompt(ctx, t)
+  return buildPrompt(ctx, t, proficiencyScore)
 }
 

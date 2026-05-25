@@ -45,6 +45,10 @@ export function parseAIReply(reply) {
     .replace(/\[\/?sidebar\]/g, '')
     .replace(/<\/?sidebar>/g, '')
     .replace(/<\/?correction>/g, '')
+  // Strip stage directions: （non-kana content）but preserve furigana like 漢字（かんじ）
+  mainText = mainText.replace(/（(?![\u3040-\u309f\u30a0-\u30ff]+）)[^）]+）/g, '')
+  // Clean up blank lines left by removals
+  mainText = mainText.replace(/\n{3,}/g, '\n\n')
   mainText = mainText.trim()
 
   return { mainText, conversationEnded, goalAchieved, completedTasks }
@@ -67,7 +71,7 @@ export async function sendToAI(
       : 'Please provide a valid API Key and try again.'
   }
 
-  const systemPrompt = buildSystemPrompt(ctx, language)
+  const systemPrompt = buildSystemPrompt(ctx, language, ctx?.proficiencyScore ?? null)
 
   // Build messages array
   let messages
@@ -99,14 +103,7 @@ export async function sendToAI(
     }
   }
 
-  // Debug: log messages count and last 3 messages
-  debug.log(
-    `[sendToAI] Messages count: ${messages.length}, isLastRound: ${isLastRound}`
-  )
-  const last3 = messages.slice(-3)
-  last3.forEach((m, i) => {
-    debug.log(`[sendToAI] 消息 #${messages.length - 3 + i}: role=${m.role}, content="${(m.content || '').slice(0, 80)}..."`)
-  })
+
 
   try {
     const response = await fetch(API_URL, {
@@ -140,21 +137,54 @@ export async function sendToAI(
 /**
  * Generate a conversation goal based on the selected scenario.
  */
-export async function generateConversationGoal(scenario, language = 'en') {
+export async function generateConversationGoal(scenario, language = 'en', proficiencyScore = null) {
   const apiKey = await getApiKey()
   if (!apiKey) return ''
 
+  const scoreStr = proficiencyScore !== null ? proficiencyScore.toFixed(1) : 'N/A'
+
+  // Build proficiency-aware guidance
+  let levelGuidance = ''
+  if (proficiencyScore !== null) {
+    if (language === 'ja') {
+      levelGuidance = `ユーザーの日本語レベル: 約${scoreStr}/10\n`
+      if (proficiencyScore < 4) {
+        levelGuidance += '- 非常に簡単な目標のみ。例：「はい/いいえ」で答えられる簡単な質問に返答する。「〜です」だけで答えられる質問に答える。\n'
+        levelGuidance += '- 1つだけ目標を生成してください。\n'
+      } else if (proficiencyScore < 6) {
+        levelGuidance += '- 日常的な場面での基本的な会話目標。短文で表現できること。\n'
+        levelGuidance += '- 最大2つの目標。\n'
+      } else {
+        levelGuidance += '- より複雑な会話目標。意見表明や理由説明を含む。\n'
+        levelGuidance += '- 最大3つの目標。\n'
+      }
+    } else {
+      levelGuidance = `Learner's English level: ~${scoreStr}/10\n`
+      if (proficiencyScore < 4) {
+        levelGuidance += '- VERY simple goals only. E.g., respond to simple yes/no questions, answer with single words or very short phrases.\n'
+        levelGuidance += '- Generate only 1 goal.\n'
+      } else if (proficiencyScore < 6) {
+        levelGuidance += '- Basic daily conversation goals. Short sentences, familiar topics.\n'
+        levelGuidance += '- Generate at most 2 goals.\n'
+      } else {
+        levelGuidance += '- More complex goals. Expressing opinions, giving reasons, handling unexpected turns.\n'
+        levelGuidance += '- Generate at most 3 goals.\n'
+      }
+    }
+  }
+
   const systemPrompt = language === 'ja'
-    ? 'あなたは会話シーンアシスタントです。ユーザーは日本語を練習しています。選択されたシーンに基づいて、具体的な会話目標を生成してください。中文で返し、複数のサブ目標は改行で区切ってください。最大3つ。\n\n' +
+    ? 'あなたは会話シーンアシスタントです。ユーザーは日本語を練習しています。選択されたシーンに基づいて、具体的な会話目標を生成してください。中文で返し、複数のサブ目標は改行で区切ってください。\n\n' +
+      levelGuidance + '\n' +
       '例（レストラン注文）：\n' +
       '用日语点一道主菜\n' +
       '用日语询问今日特色菜\n' +
       '用日语请求开发票\n\n' +
       'そのままテキストだけを返してください。'
     : '用户正在练习英语对话，目标是提升英语口语能力。你是一个对话场景助手。根据用户选择的场景，生成具体的英语对话练习目标。\n\n' +
+      levelGuidance + '\n' +
       '要求：\n' +
       '- 用中文返回，多个子目标用换行符分隔，每个子目标一行\n' +
-      '- 最多3条子目标\n' +
       '- 直接返回纯文本，不要编号、不要其他内容\n' +
       '- 每次生成的内容要有随机性和多样性，不要每次都返回类似的子目标\n' +
       '- 可以从不同角度切入：点餐流程、社交礼仪、特殊需求、文化差异、价格沟通、口味偏好等\n\n' +
@@ -220,15 +250,23 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
   const apiKey = await getApiKey()
   if (!apiKey) return 'Unable to generate summary: Please provide a valid API Key.'
 
+  const isAssessment = ctx?.isAssessment === true
+
   const systemPrompt = language === 'ja'
-    ? 'あなたは日本語学習分析の専門家です。会話履歴に基づいて、構造化された学習サマリーを生成してください。\n' +
+    ? 'あなたは' + (isAssessment ? '日本語能力評価の専門家です。この会話はレベル診断テストです。' : '日本語学習分析の専門家です。') + '会話履歴に基づいて、' + (isAssessment ? '診断レポート' : '構造化された学習サマリー') + 'を生成してください。\n' +
       'JSON 形式で返してください。他のテキストは不要です：\n' +
       '{\n' +
       '  completion: { rating: string, detail: string },\n' +
       '  strengths: [{ point: string }],\n' +
       '  weaknesses: [{ point: string, example: string }],\n' +
       '  newKnowledge: [{ word: string, meaning: string }],\n' +
-      '  suggestions: [{ suggestion: string }]\n' +
+      '  suggestions: [{ suggestion: string }],\n' +
+      '  proficiencyAssessment: {\n' +
+      '    currentScore: number,\n' +
+      '    scoreChange: number,\n' +
+      '    direction: "up"|"down"|"same",\n' +
+      '    summary: string\n' +
+      '  }\n' +
       '}\n' +
       '\n' +
       '各フィールドの説明：\n' +
@@ -239,16 +277,49 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       '- newKnowledge: 新しい知識、各 word は日本語の単語、meaning は日本語での説明\n' +
       '- suggestions: 学習アドバイス、各 suggestion は一文で。必ず1つ以上書くこと。\n' +
       '\n' +
+      '【習熟度評価の指示】\n' +
+      'proficiencyAssessment は学習者の現在の習熟度を1-10の小数点数で評価します。\n' +
+      '- currentScore: 今回の会話に基づく現在の評価スコア（例: 4.25）\n' +
+      '- scoreChange: 前回と比較した変化量（正=向上、負=低下、0=維持）\n' +
+      '- direction: "up"（向上）、"down"（低下）、または "same"（維持）\n' +
+      '- summary: 習熟度変化の簡潔な説明（日本語で一言。例：「語彙力が向上しています」）\n' +
+      '\n' +
+      '採点の参考: レベル5=サバイバル会話可能、レベル6=基本流暢、レベル7=自立運用\n' +
+      '小さな変化（±0.05〜0.30）を適切に反映してください。\n' +
+      '前回のスコア（もしあれば）を基準に変化を測ってください。\n' +
+      (isAssessment
+        ? '\n' +
+          '【診断特別指示】\n' +
+          'これは初回レベル診断です。以下の点に注意してください：\n' +
+          '- scoreChange は 0 にしてください（初回評価のため）\n' +
+          '- direction は "same" にしてください\n' +
+          '- 総合スコアに加えて、summaryフィールドに以下の4次元の内訳を含めてください：\n' +
+          '  「語彙: X.X / 文法: X.X / 流暢さ: X.X / 理解力: X.X」\n' +
+          '- 会話の進行に応じて適切なレベルを判断してください\n' +
+          '- レベル1-4: 基本的な文が作れない・単語レベル\n' +
+          '- レベル5-6: 日常会話が可能だが複雑な話題で苦戦\n' +
+          '- レベル7-8: 幅広い話題で自然に会話可能\n' +
+          '- レベル9-10: 母語話者に近い・専門的な運用が可能\n'
+        : '') +
+      '\n' +
       'すべて日本語で記述してください。各配列は少なくとも1項目含むこと。JSONのみ返してください。\n' +
       'CRITICAL: Return ONLY the JSON object. Do not add any greeting, explanation, or other text. Start with { and end with {}.'
-    : '你是英语学习分析专家。根据对话历史，生成结构化的学习总结。\n' +
+    : (isAssessment
+      ? 'You are a language proficiency assessment specialist. This conversation was a level diagnostic. Generate a diagnostic report.\n'
+      : '你是英语学习分析专家。根据对话历史，生成结构化的学习总结。\n') +
       '返回 JSON 格式，不要其他文字：\n' +
       '{\n' +
       '  completion: { rating: string, detail: string },\n' +
       '  strengths: [{ point: string }],\n' +
       '  weaknesses: [{ point: string, example: string }],\n' +
       '  newKnowledge: [{ word: string, meaning: string }],\n' +
-      '  suggestions: [{ suggestion: string }]\n' +
+      '  suggestions: [{ suggestion: string }],\n' +
+      '  proficiencyAssessment: {\n' +
+      '    currentScore: number,\n' +
+      '    scoreChange: number,\n' +
+      '    direction: "up"|"down"|"same",\n' +
+      '    summary: string\n' +
+      '  }\n' +
       '}\n' +
       '\n' +
       '各字段说明：\n' +
@@ -258,6 +329,32 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       '- weaknesses: 需改进的语法点，每项 point 是问题描述，example 是对话中的错误示例\n' +
       '- newKnowledge: 新知识点，每项 word 是英文，meaning 是中文释义\n' +
       '- suggestions: 学习建议，每项 suggestion 一句话。必须写至少1项。\n' +
+      '\n' +
+      '【Proficiency Assessment Instructions】\n' +
+      'proficiencyAssessment evaluates the learner\'s current proficiency as a 1-10 decimal.\n' +
+      '- currentScore: Current assessed score based on this conversation (e.g., 4.25)\n' +
+      '- scoreChange: Estimated change from the last conversation\n' +
+      '  (positive=improvement, negative=regression, 0=maintained)\n' +
+      '- direction: "up" (improved), "down" (regressed), or "same" (maintained)\n' +
+      '- summary: Brief explanation in Chinese (one sentence, e.g., "词汇运用更加自如")\n' +
+      '\n' +
+      'Scoring reference: Level 5=survival, Level 6=basic fluency, Level 7=independent\n' +
+      'Reflect small changes appropriately (±0.05 to ±0.30).\n' +
+      'Use the previous score (if available) as a reference for the change.\n' +
+      (isAssessment
+        ? '\n' +
+          '【Assessment Special Instructions】\n' +
+          'This is a first-time level diagnostic. Note the following:\n' +
+          '- Set scoreChange to 0 (first assessment, no prior baseline)\n' +
+          '- Set direction to "same"\n' +
+          '- In addition to the overall score, include the following 4-dimensional breakdown in the summary field:\n' +
+          '  "Vocabulary: X.X / Grammar: X.X / Fluency: X.X / Comprehension: X.X"\n' +
+          '- Judge the appropriate level based on how the conversation progressed:\n' +
+          '- Level 1-4: Cannot form basic sentences, word-level only\n' +
+          '- Level 5-6: Can handle daily conversation but struggles with complex topics\n' +
+          '- Level 7-8: Can converse naturally on a wide range of topics\n' +
+          '- Level 9-10: Near-native or expert-level proficiency\n'
+        : '') +
       '\n' +
       '所有内容用中文撰写。每个数组至少包含1项。只返回 JSON。\n' +
       'CRITICAL: Return ONLY the JSON object. Do not add any greeting, explanation, or other text. Start with { and end with {}.'

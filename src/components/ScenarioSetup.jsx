@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SCENARIOS } from '../config/languages'
+import { debug } from '../utils/debug'
 import './ScenarioSetup.css'
 
 const ScenarioSetup = memo(function ScenarioSetup({
@@ -17,6 +18,10 @@ const ScenarioSetup = memo(function ScenarioSetup({
   onTargetKnowledgeChange,
   onStartChat,
   generateGoal,
+  isFirstTime = false,
+  onStartAssessment,
+  onSkipAssessment,
+  proficiencyScore = null,
 }) {
   const { t } = useTranslation()
   const [showConfirm, setShowConfirm] = useState(false)
@@ -74,6 +79,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
     if (goalLoading || generatingRef.current) return
     generatingRef.current = true
     setGoalLoading(true)
+    debug.proficiency(`[ScenarioSetup] 随机生成目标时评分: ${language.toUpperCase()} = ${proficiencyScore !== null ? proficiencyScore.toFixed(2) : 'N/A'}`)
     try {
       const goal = await generateGoal(getEffectiveScenario())
       if (goal) {
@@ -153,6 +159,31 @@ const ScenarioSetup = memo(function ScenarioSetup({
   return (
     <div className="scenario-setup">
       <h2 className="scenario-title">{t('scenarioSetup')}</h2>
+
+      {/* Assessment banner for first-time users — always in Chinese for accessibility */}
+      {isFirstTime && (
+        <div className="assessment-banner">
+          <div className="assessment-banner-icon">🔍</div>
+          <div className="assessment-banner-text">
+            <strong>欢迎！先来测测你的水平吧</strong>
+            <p>通过一段简短的对话（约 8-10 轮）来评估你当前的外语水平。AI 会根据你的回答自动调整难度。</p>
+          </div>
+          <div className="assessment-banner-actions">
+            <button
+              className="assessment-start-btn"
+              onClick={() => onStartAssessment?.()}
+            >
+              开始测评
+            </button>
+            <button
+              className="assessment-skip-btn"
+              onClick={() => onSkipAssessment?.()}
+            >
+              跳过（默认 Lv.3）
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="scenario-fields-wrapper">
         {/* 场景选择 */}

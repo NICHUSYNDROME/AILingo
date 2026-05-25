@@ -6,10 +6,12 @@ import { debug } from './utils/debug'
 import { useScenarioState } from './hooks/useScenarioState'
 import { useSidebarState } from './hooks/useSidebarState'
 import { useKnowledgePoints } from './hooks/useKnowledgePoints'
+import { useProficiency } from './hooks/useProficiency'
 import { useLanguage } from './context/LanguageContext'
 import { useTheme } from './context/ThemeContext'
 import { SCENARIOS } from './config/languages'
 import { getDictSystemPrompt } from './config/prompts'
+import { DEFAULT_PROFICIENCY_SCORE } from './config/proficiency'
 import { getLocalDateString } from './utils/date'
 import { useResponsive } from './hooks/useResponsive'
 import './App.css'
@@ -62,6 +64,9 @@ function App() {
     loadMutedState()
   }, [])
 
+  // === Proficiency scoring (implicit, debug-only) ===
+  const { score: proficiencyScore, setScore: setProficiencyScore, isFirstTime, resetScore: resetProficiencyScore } = useProficiency(language)
+
   // === Scenario + center state machine ===
   const currentScenarios = SCENARIOS[language] || SCENARIOS.en
   const {
@@ -78,7 +83,10 @@ function App() {
     handleChatEnd,
     handleStartQuiz,
     handleQuizEnd,
-  } = useScenarioState(language, currentScenarios)
+    handleStartAssessment,
+    handleSkipAssessment,
+    handleAssessmentEnd,
+  } = useScenarioState(language, currentScenarios, proficiencyScore)
 
   // === Knowledge points ===
   const {
@@ -150,6 +158,24 @@ function App() {
     [updatePoint]
   )
 
+  // Assessment skip: set default score and stay idle
+  const handleSkipAssessmentWithDefault = useCallback(() => {
+    setProficiencyScore(DEFAULT_PROFICIENCY_SCORE, 'user skipped assessment')
+    handleSkipAssessment()
+  }, [setProficiencyScore, handleSkipAssessment])
+
+  // Clear proficiency results (keeps knowledge points)
+  const handleClearProficiency = useCallback(() => {
+    resetProficiencyScore()
+  }, [resetProficiencyScore])
+
+  // Clear all knowledge points for current language
+  const handleClearKnowledge = useCallback(() => {
+    const STORAGE_KEY = language === 'ja' ? 'ja_knowledge_points' : 'en_knowledge_points'
+    localStorage.removeItem(STORAGE_KEY)
+    window.location.reload()
+  }, [language])
+
   // ── Delegate rendering to AppView ──────────────────────────────
   return (
     <AppView
@@ -184,6 +210,12 @@ function App() {
       handleChatEnd={handleChatEnd}
       handleStartQuiz={handleStartQuiz}
       handleQuizEnd={handleQuizEnd}
+      handleStartAssessment={handleStartAssessment}
+      handleSkipAssessment={handleSkipAssessmentWithDefault}
+      handleAssessmentEnd={handleAssessmentEnd}
+      isFirstTime={isFirstTime}
+      onClearProficiency={handleClearProficiency}
+      onClearKnowledge={handleClearKnowledge}
       knowledgePoints={knowledgePoints}
       addPoint={addPoint}
       deletePoint={handleDeletePoint}
@@ -198,6 +230,8 @@ function App() {
       sidebarContentType={sidebarContentType}
       expandedChinese={expandedChinese}
       setExpandedChinese={setExpandedChinese}
+      proficiencyScore={proficiencyScore}
+      setProficiencyScore={setProficiencyScore}
       dictQuery={dictQuery}
       setDictQuery={setDictQuery}
       dictLoading={dictLoading}

@@ -20,4 +20,8 @@ export const debug = {
   error: (...args) => {
     console.error(...args)
   },
+  /** Proficiency score logging (dev only, prefixed for easy filtering). */
+  proficiency: (...args) => {
+    if (isDev) console.log('[PROFICIENCY]', ...args)
+  },
 }

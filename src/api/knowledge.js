@@ -4,6 +4,7 @@
 
 import { API_URL, getApiKey, parseJSONResponse } from './client'
 import { debug } from '../utils/debug'
+import { getKnowledgeProficiencyScoringGuide } from '../config/proficiency'
 
 /**
  * Extract a single structured knowledge point from a specific trigger event.
@@ -38,6 +39,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
     return null
   }
 
+  const scoringGuide = getKnowledgeProficiencyScoringGuide(language)
   const systemPrompt = language === 'ja'
     ? '以下のトリガー情報から構造化された知識ポイントを抽出してください。\n' +
       '厳密な JSON 形式で返してください。他のテキストは不要です。JSON には以下のフィールドがすべて含まれている必要があります：\n' +
@@ -49,8 +51,11 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
       '  "partOfSpeech": "noun|verb|adjective...",\n' +
       '  "example": "例文",\n' +
       '  "context": "出典の文",\n' +
-      '  "phonetic": "読み仮名（例：れすとらん）"\n' +
+      '  "phonetic": "読み仮名（例：れすとらん）",\n' +
+      '  "proficiency": 4.5\n' +
       '}\n' +
+      '\n' +
+      scoringGuide + '\n' +
       '\n' +
       'ユーザーが自ら検索した単語の場合は、その単語の完全な情報を抽出し、例文を必ず含めてください。\n' +
       '訂正がトリガーの場合は、訂正対象の表現を抽出：word は正しい表現、meaning は日本語での説明、context はユーザーの元の誤った文、正しい使い方を示す例文を必ず含めてください。\n' +
@@ -86,8 +91,11 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
       '  "partOfSpeech": "noun|verb|adjective...",\n' +
       '  "example": "an example sentence",\n' +
       '  "context": "source sentence",\n' +
-      '  "phonetic": "phonetic transcription (e.g., /ˈrestərɒnt/)"\n' +
+      '  "phonetic": "phonetic transcription (e.g., /ˈrestərɒnt/)",\n' +
+      '  "proficiency": 4.5\n' +
       '}\n' +
+      '\n' +
+      scoringGuide + '\n' +
       '\n' +
       '如果是用户主动查询的词，提取该词的完整信息，必须包含一个例句。\n' +
       '如果是纠错触发的，提取纠正目标表达：word 为正确表达，meaning 为英文解释，context 为用户原始错误句子，必须包含一个例句展示正确用法。\n' +
@@ -120,11 +128,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
     { role: 'user', content: userContent },
   ]
 
-  // Debug: log the full system prompt to verify phonetic instructions are present
-  debug.log('[extractSpecificKnowledge] === System Prompt (phonetic debug) ===')
-  debug.log(systemPrompt)
-  debug.log('[extractSpecificKnowledge] === End System Prompt ===')
-  debug.log('[extractSpecificKnowledge] Trigger:', triggerDescription)
+
 
   try {
     const response = await fetch(API_URL, {

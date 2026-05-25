@@ -355,3 +355,90 @@
 .custom-scenario-input::placeholder {
   color: var(--text-tertiary);
 }
+
+/* ===== Assessment Banner ===== */
+.assessment-banner {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%);
+  border: 1px solid #91caff;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+[data-theme="dark"] .assessment-banner {
+  background: linear-gradient(135deg, #111d2c 0%, #1a1f35 100%);
+  border-color: #15395b;
+}
+
+.assessment-banner-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.assessment-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.assessment-banner-text strong {
+  display: block;
+  font-size: 15px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.assessment-banner-text p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.assessment-banner-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.assessment-start-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.assessment-start-btn:hover {
+  background: var(--accent-blue-hover);
+}
+
+.assessment-skip-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.assessment-skip-btn:hover {
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+}

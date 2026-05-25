@@ -47,9 +47,7 @@ const renderMarkdown = (text) => {
 const computeWordDiff = (originalWords, correctedWords) => {
   const ops = []
   let i = 0, j = 0
-  
-  debug.log('[computeWordDiff] original:', originalWords)
-  debug.log('[computeWordDiff] corrected:', correctedWords)
+
   
   while (i < originalWords.length || j < correctedWords.length) {
     if (i < originalWords.length && j < correctedWords.length && originalWords[i] === correctedWords[j]) {
@@ -112,8 +110,7 @@ const computeWordDiff = (originalWords, correctedWords) => {
       mergedOps.push(op)
     }
   }
-  
-  debug.log('[computeWordDiff] merged ops:', mergedOps)
+
   return mergedOps
 }
 
@@ -122,6 +119,7 @@ const computeWordDiff = (originalWords, correctedWords) => {
 // For Japanese (no spaces between tokens), the separator offset is 0 instead of 1
 const convertOpsToAnnotations = (ops, originalText, originalWords, hasSpaces = true) => {
   const annotations = []
+  if (!ops || !Array.isArray(ops)) return annotations
   let currentPos = 0
   const separatorLen = hasSpaces ? 1 : 0
   
@@ -182,20 +180,11 @@ const findDifferences = (original, corrected, language) => {
   const originalWords = tokenize(original, language)
   const correctedWords = tokenize(corrected, language)
   
-  debug.log('[findDifferences] ===== START DIFF =====')
-  debug.log('[findDifferences] original:', original)
-  debug.log('[findDifferences] corrected:', corrected)
-  debug.log('[findDifferences] original words:', originalWords)
-  debug.log('[findDifferences] corrected words:', correctedWords)
-  
   const ops = computeWordDiff(originalWords, correctedWords)
-  debug.log('[findDifferences] edit script ops:', ops)
   
   // Japanese has no spaces between tokens; English does
   const hasSpaces = language !== 'ja'
   const annotations = convertOpsToAnnotations(ops, original, originalWords, hasSpaces)
-  debug.log('[findDifferences] final annotations:', annotations)
-  debug.log('[findDifferences] ===== END DIFF =====')
   
   return annotations
 }
@@ -227,15 +216,13 @@ const generateAnnotatedMessage = (originalText, annotations) => {
     result = before + annotated + after
   }
   
-  debug.log('[generateAnnotatedMessage] missing words (INSERT):', inserts.map(i => i.corrected))
-  
   return {
     annotatedHtml: result,
     missingWords: inserts.map(i => i.corrected)
   }
 }
 
-function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow }) {
+function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow, onProficiencyChange }) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -281,11 +268,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     summary: false
   })
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.debugAnalysisResults = analysisResults
-    }
-  }, [analysisResults])
+
 
   const generateMessageId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`
 
@@ -386,20 +369,22 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         setLoading(false)
         setAiStarted(false)
 
-        // 开场消息使用 Agent 2C (generateHints) 生成提示
-        generateHints(mainText, language).then(hintsResult => {
-          if (hintsResult && hintsResult.hints && hintsResult.hints.suggestions && hintsResult.hints.suggestions.length > 0) {
-            setAnalysisResults(prev => ({
-              ...prev,
-              [openingAiMsgId]: {
-                ...prev[openingAiMsgId],
-                hints: hintsResult.hints
-              }
-            }))
-          }
-        }).catch(err => {
-          debug.error('[Agent 2C] 开场提示生成失败:', err)
-        })
+        // 开场消息：评估模式下跳过 Hints 生成
+        if (!ctx?.isAssessment) {
+          generateHints(mainText, language).then(hintsResult => {
+            if (hintsResult && hintsResult.hints && hintsResult.hints.suggestions && hintsResult.hints.suggestions.length > 0) {
+              setAnalysisResults(prev => ({
+                ...prev,
+                [openingAiMsgId]: {
+                  ...prev[openingAiMsgId],
+                  hints: hintsResult.hints
+                }
+              }))
+            }
+          }).catch(err => {
+            debug.error('[Agent 2C] 开场提示生成失败:', err)
+          })
+        }
       }
 
       doAiStart()
@@ -416,7 +401,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       const increment = currentCount - lastCount
       setSessionConfirmedCount((prev) => {
         const newCount = prev + increment
-        debug.log(`[ChatArea] 知识点确认计数增加 ${increment}，当前会话累计: ${newCount}`)
+  
         return newCount
       })
       logActivity('knowledge', increment, language)
@@ -446,7 +431,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     const target = targetKnowledge ?? ctx?.targetKnowledge ?? 0
 
     if (target > 0 && sessionConfirmedCount >= target) {
-      debug.log(`本次对话新确认知识点数: ${sessionConfirmedCount}, 目标: ${target}`)
+
       debug.log('[ChatArea] 知识点目标已达到，标记 targetReachedRef，下一轮发送将触发收尾')
       targetReachedRef.current = true
     }
@@ -454,6 +439,14 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
   const getSystemMessage = () => {
     if (!ctx) return ''
+    if (ctx.isAssessment) {
+      return {
+        scenarioName: language === 'ja' ? '🔍 レベル診断' : '🔍 Level Assessment',
+        sensitivity: '-',
+        maxRounds: ctx.maxRounds,
+        targetKnowledge: '-',
+      }
+    }
     const currentScenarios = SCENARIOS[language] || SCENARIOS.en
     const currentSensitivityLabels = SENSITIVITY_LABELS[language] || SENSITIVITY_LABELS.en
     const scenarioLabel = currentScenarios.find((s) => s.value === ctx.scenario)?.label || ctx.scenario
@@ -485,6 +478,19 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         if (!summaryData.completion || !summaryData.strengths || !summaryData.weaknesses ||
             !summaryData.newKnowledge || !summaryData.suggestions) {
           summaryData = null
+        } else {
+          // Handle proficiency assessment (implicit — debug only, never shown to user)
+          const pa = summaryData.proficiencyAssessment
+          if (pa && typeof pa.currentScore === 'number' && onProficiencyChange) {
+            onProficiencyChange(pa.currentScore, pa.summary || 'Conversation summary')
+            debug.proficiency(
+              `[Summary] Proficiency assessment: ${pa.currentScore.toFixed(2)} ` +
+              `(${pa.direction === 'up' ? '↑' : pa.direction === 'down' ? '↓' : '→'} ` +
+              `${Math.abs(pa.scoreChange || 0).toFixed(2)}) — ${pa.summary || ''}`
+            )
+          } else if (pa) {
+            debug.proficiency('[Summary] proficiencyAssessment found but onProficiencyChange not available, skipping score update.')
+          }
         }
       } catch {
       }
@@ -589,7 +595,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
               status: 'active',
               confirmed: false
             })
-            debug.log('[processKnowledgePoints] 重置已有知识点:', point.word)
+            debug.log("[processKnowledgePoints] 重置已有知识点:", point.word)
           }
         } else {
           // 不存在：创建新知识点
@@ -604,8 +610,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
               phonetic: '',
               context: context || '',
               source: 'grammar_correction'
-            })
-            debug.log('[processKnowledgePoints] 添加语法知识点:', point.word)
+          })
           } else if (point.type === 'phrase') {
             // 短语知识点：调用查词 API 获取释义
             try {
@@ -620,7 +625,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   context: context || '',
                   source: 'spelling_correction'
                 })
-                debug.log('[processKnowledgePoints] 添加短语知识点（查词）:', point.word)
               } else {
                 // 查词失败，使用 2E 提供的基本信息
                 onAddKnowledgePoint({
@@ -632,7 +636,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   context: context || '',
                   source: 'spelling_correction'
                 })
-                debug.log('[processKnowledgePoints] 添加短语知识点（基础）:', point.word)
               }
             } catch (err) {
               debug.warn('[processKnowledgePoints] 短语查词失败:', point.word, err)
@@ -660,7 +663,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   context: context || '',
                   source: 'spelling_correction'
                 })
-                debug.log('[processKnowledgePoints] 添加单词知识点（查词）:', point.word)
               } else {
                 // 查词失败，使用基本信息
                 onAddKnowledgePoint({
@@ -672,7 +674,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                   context: context || '',
                   source: 'spelling_correction'
                 })
-                debug.log('[processKnowledgePoints] 添加单词知识点（基础）:', point.word)
               }
             } catch (err) {
               debug.warn('[processKnowledgePoints] 查词失败:', point.word, err)
@@ -753,29 +754,52 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     setLoading(true)
     setLastUserMessageId(userMessageId)
 
-    debug.log(`[ChatArea handleSend] 当前 messages 总数: ${messages.length}`)
-    debug.log(`[ChatArea handleSend] 本次用户消息: "${text.slice(0, 50)}..."`)
+
 
     const isLastRound = roundCount + 1 >= maxRounds
     const targetReached = targetReachedRef.current
 
     const endKeywords = ['goodbye', 'bye', 'see you', 'that\'s all', 'i have to go', 'see ya', 'talk to you later', 'bye-bye', 'good bye', 'gotta go', 'have to go', 'i\'m done', 'that is all', 'that\'s it']
     const userEnding = endKeywords.some(kw => text.toLowerCase().includes(kw))
-    const effectiveLastRound = isLastRound || targetReached || userEnding
-    if (userEnding) {
-      debug.log('检测到用户结束意图，强制触发收尾')
-    }
-    if (targetReached) {
-      debug.log('知识点目标已达成，本轮发送 isLastRound=true，给 AI 一轮机会自然收尾')
-    }
 
     const conversationHistory = [...messages, { role: 'user', content: text }].map((m) => ({
       role: m.role,
       content: m.content,
     }))
 
+    // ===== 先检查 TODO 完成情况（在 AI 回复之前）=====
+    const isAssessment = ctx?.isAssessment === true
+    let allTasksDone = targetReached
+    if (todos.length > 0 && ctx?.goal && !isAssessment) {
+      const latestMsgs = conversationHistory.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }))
+      const newCompleted = await checkTaskCompletion(ctx.goal, todos, latestMsgs, language)
+      if (newCompleted.length > 0) {
+        debug.log('[ChatArea] checkTaskCompletion 检测到新完成任务:', newCompleted)
+        const updatedTodos = todos.map((t) =>
+          newCompleted.includes(t.id + 1) ? { ...t, completed: true } : t
+        )
+        setTodos(updatedTodos)
+        allTasksDone = updatedTodos.every((t) => t.completed)
+        if (allTasksDone) {
+          debug.log('[ChatArea] 所有 TODO 任务已完成，本轮直接触发收尾')
+          targetReachedRef.current = true
+        }
+      }
+    }
+
+    const effectiveLastRound = isLastRound || allTasksDone || userEnding
+    if (userEnding) {
+      debug.log('检测到用户结束意图，强制触发收尾')
+    }
+    if (allTasksDone && !targetReached) {
+      debug.log('TODO 全部完成，本轮 isLastRound=true，AI 将直接结束对话')
+    }
+
     try {
-      // ===== 提前创建 AI 消息 ID，用于后续 analysisResults 初始化 =====
+      // ===== 预先创建 AI 消息 ID，用于后续 analysisResults 初始化 =====
       const aiMessageId = generateMessageId()
 
       // ===== 立即初始化 analysisResults（确保渲染时已存在）=====
@@ -789,20 +813,25 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         }
       }))
 
-      // ===== Step 1: 并行调用 Agent 1 + Agent 2A =====
-      debug.log('[handleSend] Step 1: 并行调用 Agent 1 + Agent 2A')
-      setIsProcessing(prev => ({ ...prev, spelling: true }))
+      // ===== Step 1: 仅 Agent 1（评估模式下跳过 Agent 2 全部）=====
       const sensitivity = ctx?.sensitivity || 'normal'
+
+      let spellCheckResultValue = null
+      if (!isAssessment) {
+        setIsProcessing(prev => ({ ...prev, spelling: true }))
+      }
 
       const [agent1Result, spellCheckResult] = await Promise.allSettled([
         sendToAI(text, conversationHistory, ctx, effectiveLastRound, language),
-        correctUserMessage(text, sensitivity, language)
+        isAssessment ? Promise.resolve(null) : correctUserMessage(text, sensitivity, language)
       ])
 
-      setIsProcessing(prev => ({ ...prev, spelling: false }))
-
       const agent1Reply = agent1Result.status === 'fulfilled' ? agent1Result.value : null
-      const spellCheckResultValue = spellCheckResult.status === 'fulfilled' ? spellCheckResult.value : null
+
+      if (!isAssessment) {
+        setIsProcessing(prev => ({ ...prev, spelling: false }))
+        spellCheckResultValue = spellCheckResult.status === 'fulfilled' ? spellCheckResult.value : null
+      }
 
       // Agent 1 失败时的降级处理
       if (!agent1Reply) {
@@ -818,18 +847,19 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         return
       }
 
-      if (spellCheckResult.status === 'rejected') {
+      if (spellCheckResult && spellCheckResult.status === 'rejected' && !isAssessment) {
         debug.warn('[handleSend] Agent 2A (correctUserMessage) failed:', spellCheckResult.reason)
       }
 
-      setCorrectionResult(spellCheckResultValue)
+      if (!isAssessment) setCorrectionResult(spellCheckResultValue)
 
       const parsed = parseAIReply(agent1Reply)
       const { mainText, goalAchieved } = parsed
-      debug.log('[ChatArea handleSend] parseAIReply 结果:', { goalAchieved })
 
+      let aiMessage
+
+      if (!isAssessment) {
       // ===== Step 2: Agent 2B - 语法分析（基于用户原文 vs 纠正后）=====
-      debug.log('[handleSend] Step 2: Agent 2B - 语法分析')
       setIsProcessing(prev => ({ ...prev, grammar: true }))
       const correction = spellCheckResultValue?.correction
       const correctedText = correction?.corrected || text
@@ -838,7 +868,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       setGrammarAnalysis(grammarResult)
 
       // ===== Step 3: Agent 1 返回后，并行调用 Agent 2C + Agent 2D =====
-      debug.log('[handleSend] Step 3: 并行调用 Agent 2C + Agent 2D')
       setIsProcessing(prev => ({ ...prev, hints: true, extraction: true }))
 
       const [hintsSettled, extractionSettled] = await Promise.allSettled([
@@ -860,11 +889,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       setHintsResult(hintsResult)
       setExtractedCorrections(extractionResult)
-      debug.log('[ChatArea] 2C hintsResult:', hintsResult)
-      debug.log('[ChatArea] 2D extractionResult:', extractionResult)
-
       // ===== Step 4: Agent 2E - 汇总 Tips 并提取知识点 =====
-      debug.log('[handleSend] Step 4: Agent 2E - 汇总 Tips 并提取知识点')
       setIsProcessing(prev => ({ ...prev, summary: true }))
       const summaryResult = await summarizeTipsAndExtractKnowledge(
         grammarResult,
@@ -889,7 +914,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         if (differences.length > 0) {
           const { annotatedHtml: diffHtml } = generateAnnotatedMessage(text, differences)
           annotatedHtml = diffHtml
-          debug.log('[handleSend] 使用 diff 生成 Correction 标注，差异数:', differences.length)
+
         } else {
           // 降级：简单显示
           annotatedHtml = `<span class="spelling-correction">${escapeHtml(text)}</span> → <span class="spelling-suggestion">${escapeHtml(correction.corrected)}</span>`
@@ -901,7 +926,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
           annotatedHtml: annotatedHtml,
           explanation: correction.explanation || ''
         }
-        debug.log('[handleSend] Agent 2A 检测到拼写/语法纠正:', correction.corrected)
+
       }
 
       // ===== 处理知识点（Agent 2E 提取的）=====
@@ -912,13 +937,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       // ===== 使用 2D 的 cleanedReply（如果存在）作为 AI 消息内容 =====
       // cleanedReply 移除了教学建议，只保留纯对话内容
       const cleanedContent = extractionResult?.cleanedReply || mainText
-      const aiMessage = {
+      aiMessage = {
         id: aiMessageId,
         role: 'assistant',
         content: cleanedContent
       }
       if (extractionResult?.cleanedReply) {
-        debug.log('[handleSend] 使用 2D cleanedReply 替换 AI 回复（已移除教学建议）')
+
       }
 
       // 一次性添加 AI 回复
@@ -940,39 +965,22 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         spellingCorrection: spellCheckResultValue || null,
         grammarCorrections: grammarResult?.corrections || []
       }
-      debug.log('[handleSend] 存储分析结果到 analysisResults，key:', aiMessage.id, 'value:', newAnalysisResult)
+
       setAnalysisResults(prev => ({
         ...prev,
         [aiMessage.id]: newAnalysisResult
       }))
 
-      // ===== 检查 TODO 完成情况 =====
-      ;(async () => {
-        if (todos.length > 0 && ctx?.goal) {
-          const latestMsgs = conversationHistory.map((m) => ({
-            role: m.role,
-            content: m.content,
-          }))
-          latestMsgs.push({ role: 'assistant', content: mainText })
-          const newCompleted = await checkTaskCompletion(ctx.goal, todos, latestMsgs, language)
-          if (newCompleted.length > 0) {
-            debug.log('[ChatArea] checkTaskCompletion 检测到新完成任务:', newCompleted)
-            setTodos((prev) => {
-              const updated = prev.map((t) =>
-                newCompleted.includes(t.id + 1) ? { ...t, completed: true } : t
-              )
-              const allDone = updated.every((t) => t.completed)
-              if (allDone && !targetReachedRef.current) {
-                debug.log('[ChatArea] 所有 TODO 任务已完成，触发目标达成')
-                targetReachedRef.current = true
-              }
-              return updated
-            })
-          } else {
-            debug.log('[ChatArea] checkTaskCompletion 未检测到新完成任务')
-          }
+      } else {
+        // Assessment mode: skip all Agent 2, just add the AI reply directly
+        aiMessage = {
+          id: aiMessageId,
+          role: 'assistant',
+          content: mainText
         }
-      })()
+        setMessages(prev => [...prev, aiMessage])
+      }
+
       setRoundCount((prev) => prev + 1)
 
       const aiEnded = detectConversationEnd(parsed)
@@ -1173,8 +1181,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
               return (
                 <div key={i} className="chat-summary">
                   <div className="summary-inner">
-                    <span className="summary-badge">Summary</span>
-                    <div className="summary-title">📋 Learning Summary</div>
+                    <div className="summary-title">📋 对话总结</div>
                     <div className="summary-block">
                       <div className="summary-block-header completion-header"><span className="summary-block-icon">🎯</span><span>任务完成度：{sd.completion.rating}</span></div>
                       <div className="summary-block-body">{sd.completion.detail}</div>
@@ -1202,8 +1209,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
             return (
               <div key={i} className="chat-summary">
                 <div className="summary-inner">
-                  <span className="summary-badge">Summary</span>
-                  <div className="summary-title">📋 Learning Summary</div>
+                  <div className="summary-title">📋 对话总结</div>
                   <div className="summary-text">{msg.content}</div>
                 </div>
               </div>
@@ -1293,16 +1299,6 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                 })()
               )}
               {/* Hints under assistant message (Agent 2C - 来自 generateHints) */}
-              {msg.role === 'assistant' && (
-                <>
-                  {debug.log('[渲染] AI 消息 ID:', msg.id)}
-                  {debug.log('[渲染] analysisResults[msg.id]:', analysisResults[msg.id])}
-                  {debug.log('[渲染] hints 存在?', !!analysisResults[msg.id]?.hints)}
-                  {debug.log('[渲染] suggestions 数量?', analysisResults[msg.id]?.hints?.suggestions?.length)}
-                  {debug.log('[渲染] hintsExpandedMap[msg.id]:', hintsExpandedMap[msg.id])}
-                  {debug.log('[渲染] tips 数量?', analysisResults[msg.id]?.tips?.length)}
-                </>
-              )}
               {msg.role === 'assistant' && analysisResults[msg.id] && (
                 <div className="analysis-container">
                   {analysisResults[msg.id]?.hints && analysisResults[msg.id]?.hints?.suggestions?.length > 0 && (
