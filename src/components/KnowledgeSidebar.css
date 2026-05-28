@@ -88,69 +88,76 @@
   line-height: 1.6;
 }
 
-/* Individual item */
+/* Individual item — macOS folder style */
 .kp-item {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 10px 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   cursor: pointer;
-  transition: all 0.2s;
-  background: var(--card-bg);
+  transition: box-shadow 0.2s;
+  /* border moved to .kp-item-main */
 }
 
+/* Type tab — full-width folder tab, left-aligned text */
+.kp-type-tab {
+  align-self: stretch;
+  margin-left: 0;
+  margin-bottom: -1px;
+  padding: 2px 12px 3px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  border: 1px solid;
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  background: var(--card-bg);
+  z-index: 1;
+}
+
+/* Unconfirmed card: tab background matches card */
+.kp-item.kp-unconfirmed .kp-type-tab {
+  background: var(--bg-tertiary);
+}
+
+/* Item main row — carries the card's border */
+.kp-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 10px 12px;
+  border: 1px solid;
+  border-radius: 0 0 8px 8px;
+  background: var(--card-bg);
+}
 .kp-item:hover {
-  border-color: var(--accent-blue);
   box-shadow: 0 1px 4px rgba(22, 119, 255, 0.1);
 }
 
-.kp-item.kp-selected {
-  border-color: var(--accent-blue);
+.kp-item.kp-selected .kp-item-main {
   background: var(--info-bg);
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
 }
 
 /* Unconfirmed item — pending confirmation */
-.kp-item.kp-unconfirmed {
+.kp-item.kp-unconfirmed .kp-item-main {
   background: var(--bg-tertiary);
-  border-color: var(--border-color);
 }
 
 .kp-item.kp-unconfirmed:hover {
-  border-color: var(--warning-color);
   box-shadow: 0 1px 4px rgba(250, 140, 22, 0.12);
 }
 
 /* Confirmed item */
-.kp-item.kp-confirmed {
-  opacity: 1;
+.kp-item.kp-confirmed .kp-item-main {
   background: var(--card-bg);
 }
 
 .kp-item.kp-confirmed:hover {
   opacity: 1;
-}
-
-/* Item main row */
-.kp-item-main {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Type tag — uniform width for alignment */
-.kp-type-tag {
-  flex-shrink: 0;
-  display: inline-block;
-  min-width: 70px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1.4;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  box-sizing: border-box;
 }
 
 /* Text content — overflow hidden for ellipsis */
@@ -369,7 +376,7 @@
 }
 
 .kp-item.kp-batch-item:hover {
-  border-color: var(--accent-blue);
+  box-shadow: 0 1px 4px rgba(22, 119, 255, 0.1);
 }
 
 /* Batch checkbox */

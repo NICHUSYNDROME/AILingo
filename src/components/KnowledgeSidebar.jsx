@@ -369,7 +369,19 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                   }
                 }}
               >
-                <div className="kp-item-main">
+                {/* Type tab — protrudes from top-left corner */}
+                <span
+                  className="kp-type-tab"
+                  style={{
+                    color: typeCfg.color,
+                    backgroundColor: typeCfg.bg,
+                    borderColor: typeCfg.color,
+                  }}
+                >
+                  {typeCfg.label}
+                </span>
+
+                <div className="kp-item-main" style={{ borderColor: typeCfg.color }}>
                   {/* Batch checkbox */}
                   {batchMode && (
                     <input
@@ -388,17 +400,6 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                       title={isConfirmed ? t('confirmed') : t('pendingConfirmation')}
                     />
                   )}
-
-                  {/* Type tag */}
-                  <span
-                    className="kp-type-tag"
-                    style={{
-                      color: typeCfg.color,
-                      backgroundColor: typeCfg.bg,
-                    }}
-                  >
-                    {typeCfg.label}
-                  </span>
 
                   {/* Word + meaning preview (50 chars max) */}
                   <div className="kp-item-text">
