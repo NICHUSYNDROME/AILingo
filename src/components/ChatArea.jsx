@@ -250,6 +250,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   const [speakingMsgId, setSpeakingMsgId] = useState(null)
   const playingMsgIdRef = useRef(null)
   const listRef = useRef(null)
+  const textareaRef = useRef(null)
   const initialTriggered = useRef(false)
   const summaryTriggered = useRef(false)
   const targetReachedRef = useRef(false)
@@ -1049,6 +1050,18 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     }
   }
 
+  // P3-1: textarea 自适应高度（最大 120px）
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [])
+
+  useEffect(() => {
+    autoResize()
+  }, [input, autoResize])
+
   const handleNewConversation = () => {
     setMessages([])
     setInput('')
@@ -1411,7 +1424,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
       {!isMaxReached && !summaryDone && !endingRef.current && (
         <div className="chat-input-bar">
-          <textarea className="chat-input" placeholder={t('inputPlaceholder')} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading || endingRef.current} rows={1} />
+          <textarea className="chat-input" ref={textareaRef} placeholder={t('inputPlaceholder')} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading || endingRef.current} />
           <button className="chat-send-btn" onClick={handleSend} disabled={loading || !input.trim() || endingRef.current}>{t('sendBtn')}</button>
         </div>
       )}
