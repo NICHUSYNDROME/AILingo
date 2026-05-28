@@ -369,12 +369,11 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                   }
                 }}
               >
-                {/* Type tab — protrudes from top-left corner */}
+                {/* Type tab — folder tab */}
                 <span
-                  className="kp-type-tab"
+                  className={`kp-type-tab type-${displayType}`}
                   style={{
                     color: typeCfg.color,
-                    backgroundColor: typeCfg.bg,
                     borderColor: typeCfg.color,
                   }}
                 >

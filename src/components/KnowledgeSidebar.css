@@ -114,9 +114,20 @@
   line-height: 1.4;
   letter-spacing: 0.3px;
   white-space: nowrap;
-  background: var(--card-bg);
   z-index: 1;
 }
+
+/* ── Type backgrounds — light mode ── */
+.kp-type-tab.type-word     { background: #e6f4ff; }
+.kp-type-tab.type-phrase   { background: #f6ffed; }
+.kp-type-tab.type-grammar  { background: #fff7e6; }
+.kp-type-tab.type-collocation { background: #fff0f6; }
+
+/* ── Type backgrounds — dark mode ── */
+[data-theme="dark"] .kp-type-tab.type-word     { background: #1a3a6b; }
+[data-theme="dark"] .kp-type-tab.type-phrase   { background: #2a4a2a; }
+[data-theme="dark"] .kp-type-tab.type-grammar  { background: #4a3018; }
+[data-theme="dark"] .kp-type-tab.type-collocation { background: #4a1a30; }
 
 /* Unconfirmed card: tab background matches card */
 .kp-item.kp-unconfirmed .kp-type-tab {
