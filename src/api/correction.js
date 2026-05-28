@@ -471,8 +471,8 @@ export async function summarizeTipsAndExtractKnowledge(grammarAnalysis, extracte
   ]
 
 knowledgePoints の各項目には以下の追加フィールドを含めることができます（type に応じて必須）:
-- type が "word" または "phrase" の場合: meaning（英語の定義）、meaningChinese（中国語の意味）は任意
-- type が "grammar" の場合: meaning（英語での文法ルールの説明、1-2文）と meaningChinese（中国語での文法ルールの説明、1-2文）を必ず含めること
+- type が "word" または "phrase" の場合: meaning（日本語の定義）、meaningChinese（中国語の意味）は任意
+- type が "grammar" の場合: meaning（日本語での文法ルールの説明、1-2文）と meaningChinese（中国語での文法ルールの説明、1-2文）を必ず含めること
 - type が "grammar" の場合、partOfSpeech は空文字列に設定
 }
 

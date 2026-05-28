@@ -251,6 +251,16 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
   if (!apiKey) return 'Unable to generate summary: Please provide a valid API Key.'
 
   const isAssessment = ctx?.isAssessment === true
+  const prevScore = ctx?.proficiencyScore
+
+  // Build score context line — pass actual previous score so AI can compute meaningful scoreChange
+  const jaPrevScoreLine = (prevScore !== null && prevScore !== undefined && !isAssessment)
+    ? `前回のスコア（${prevScore.toFixed(2)}）を基準に変化を測ってください。\n`
+    : '前回のスコア（もしあれば）を基準に変化を測ってください。\n'
+
+  const enPrevScoreLine = (prevScore !== null && prevScore !== undefined && !isAssessment)
+    ? `The learner's previous proficiency score was ${prevScore.toFixed(2)}. Use it as a baseline to compute scoreChange.\n`
+    : 'Use the previous score (if available) as a reference for the change.\n'
 
   const systemPrompt = language === 'ja'
     ? 'あなたは' + (isAssessment ? '日本語能力評価の専門家です。この会話はレベル診断テストです。' : '日本語学習分析の専門家です。') + '会話履歴に基づいて、' + (isAssessment ? '診断レポート' : '構造化された学習サマリー') + 'を生成してください。\n' +
@@ -282,11 +292,11 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       '- currentScore: 今回の会話に基づく現在の評価スコア（例: 4.25）\n' +
       '- scoreChange: 前回と比較した変化量（正=向上、負=低下、0=維持）\n' +
       '- direction: "up"（向上）、"down"（低下）、または "same"（維持）\n' +
-      '- summary: 習熟度変化の簡潔な説明（日本語で一言。例：「語彙力が向上しています」）\n' +
+      '- summary: 習熟度変化の簡潔な説明（日本語で一言。前回と比較した表現を使ってください。例：「前回より語彙力が向上しています」）\n' +
       '\n' +
       '採点の参考: レベル5=サバイバル会話可能、レベル6=基本流暢、レベル7=自立運用\n' +
       '小さな変化（±0.05〜0.30）を適切に反映してください。\n' +
-      '前回のスコア（もしあれば）を基準に変化を測ってください。\n' +
+      jaPrevScoreLine +
       (isAssessment
         ? '\n' +
           '【診断特別指示】\n' +
@@ -336,11 +346,11 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       '- scoreChange: Estimated change from the last conversation\n' +
       '  (positive=improvement, negative=regression, 0=maintained)\n' +
       '- direction: "up" (improved), "down" (regressed), or "same" (maintained)\n' +
-      '- summary: Brief explanation in Chinese (one sentence, e.g., "词汇运用更加自如")\n' +
+      '- summary: Brief explanation in Chinese (one sentence with comparative phrasing, e.g., "比上次有明显进步，词汇运用更加自如")\n' +
       '\n' +
       'Scoring reference: Level 5=survival, Level 6=basic fluency, Level 7=independent\n' +
       'Reflect small changes appropriately (±0.05 to ±0.30).\n' +
-      'Use the previous score (if available) as a reference for the change.\n' +
+      enPrevScoreLine +
       (isAssessment
         ? '\n' +
           '【Assessment Special Instructions】\n' +

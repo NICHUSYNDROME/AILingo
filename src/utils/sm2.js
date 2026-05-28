@@ -34,15 +34,16 @@ export function calculateNextReview(quality, currentData = {}) {
   let newReps
 
   if (reps === 0) {
-    // New card, first review
+    // New card, first review — always show again tomorrow
+    newInterval = 1
     if (quality >= 2) {
-      // Correct: next review in 1 day
-      newInterval = 1
+      // Correct: advance to next stage
+      newReps = 1
     } else {
-      // Incorrect: also next review in 1 day (don't spam same day)
-      newInterval = 1
+      // Incorrect: keep reps=0 so next incorrect also stays as "new card"
+      // (prevents 0↔1 oscillation when user keeps getting it wrong)
+      newReps = 0
     }
-    newReps = 1
   } else if (reps === 1) {
     // Second review
     if (quality >= 2) {

@@ -10,10 +10,10 @@ describe('calculateNextReview — SM-2 Spaced Repetition Algorithm', () => {
       expect(result.repetitions).toBe(1)
     })
 
-    it('quality < 2 → still interval = 1, reps = 1 (no same-day spam)', () => {
+    it('quality < 2 → interval = 1, reps = 0 (stay as new card, avoid 0↔1 oscillation)', () => {
       const result = calculateNextReview(0, { easeFactor: 2.5, interval: 0, repetitions: 0 })
       expect(result.interval).toBe(1)
-      expect(result.repetitions).toBe(1)
+      expect(result.repetitions).toBe(0)
     })
 
     it('default currentData (empty object) → works', () => {
