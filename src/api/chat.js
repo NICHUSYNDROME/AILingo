@@ -92,15 +92,6 @@ export async function sendToAI(
       { role: 'system', content: systemPrompt },
       ...conversationHistory,
     ]
-
-    if (conversationHistory.length === 0) {
-      messages.push({
-        role: 'system',
-        content:
-          'DIVERSITY NOTE: Avoid cliché recommendations (steak, salmon, Caesar salad, coffee). ' +
-          'Be creative with menu items, services, or topics. Surprise the user with something fresh.',
-      })
-    }
   }
 
 

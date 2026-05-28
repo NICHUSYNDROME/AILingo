@@ -47,7 +47,7 @@ const L = {
       'When conversation reaches the final round or user signals ending: NO questions, NO new topics, NO offers. Just a brief closing.',
       'NO stage directions, inner thoughts, or action descriptions in parentheses like "(places the drink)" or "（水を置く）". You are a conversation partner, not a narrator.',
     ],
-    goalPrefix: 'Conversation Goal (background reference): ',
+    goalPrefix: 'CONVERSATION GOAL — Guide the conversation toward achieving this: ',
     scenarioMap: { restaurant: 'Restaurant Ordering', hotel: 'Hotel Check-in', business: 'Business Meeting', casual: 'Casual Chat' },
   },
   ja: {
@@ -87,7 +87,7 @@ const L = {
       '会話が最終ラウンドに達した場合/ユーザーが終了を合図: 質問しない、新しい話題を出さない、簡潔な締めくくりのみ。',
       '「（水を置く）」のような舞台指示や内心描写を絶対に入れないでください。あなたは会話相手であり、ナレーターではありません。',
     ],
-    goalPrefix: '会話の目標（背景参照用）: ',
+    goalPrefix: '【会話目標】— この目標達成に向けて会話を導いてください: ',
     scenarioMap: { restaurant: 'レストラン注文', hotel: 'ホテルチェックイン', business: 'ビジネス会議', casual: 'カジュアル会話' },
   },
 }
@@ -172,6 +172,10 @@ export function buildUniversalPrompt(language = 'en') {
     t.role, '',
     'Personality:', ...t.personality.map(s => `- ${s}`), '',
     'Conversation Style:', ...t.style.map(s => `- ${s}`), '',
+    'Objective:',
+    '- Actively guide the conversation toward achieving the user\'s stated goal(s).',
+    '- Adapt your questions and responses to help the learner practice the target skills.',
+    '',
     'Language:', ...t.langRules.map(s => `- ${s}`), '',
     'CRITICAL:', ...t.importantRules.map(s => `- ${s}`),
   ]
@@ -195,9 +199,7 @@ export function buildSceneParams(ctx, language = 'en') {
     `${t.scenarioLabel}: ${scenarioName}`,
     `${t.sensitivityLabel}: ${sensitivityDesc}`,
     t.knowledgeLabel(ctx),
-    t.roundsLabel(ctx), '',
-    'DIVERSITY:', ...t.diversity.map(s => `- ${s}`),
-    goalLine,
+    t.roundsLabel(ctx),
   ]
 
   return parts.filter(Boolean).join('\n')

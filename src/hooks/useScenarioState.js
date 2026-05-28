@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { generateConversationGoal } from '../api'
 import { buildUniversalPrompt, buildSceneParams } from '../api/prompts'
 import { getProficiencyGuidance } from '../config/proficiency'
-import { getCustomScenarios, addCustomScenario, deleteCustomScenario, getUniversalPrompt, getScenePrompt, getSceneDesc } from '../utils/scenarioStore'
+import { getCustomScenarios, addCustomScenario, deleteCustomScenario, getUniversalPrompt, getScenePrompt, getSceneDesc, getDiversity, getDiversityText } from '../utils/scenarioStore'
 
 /**
  * Manages scenario configuration and center panel state machine.
@@ -63,9 +63,10 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
   // ── Transition handlers ──────────────────────────────────────────
   const handleStartChat = useCallback(async (params) => {
     // Load custom universal + scene notes (if any)
-    const [universalCustom, sceneNotes] = await Promise.all([
+    const [universalCustom, sceneNotes, diversityLevel] = await Promise.all([
       getUniversalPrompt(language),
       getScenePrompt(language, params.scenario),
+      getDiversity(language, params.scenario),
     ])
 
     // Build the full prompt programmatically:
@@ -88,7 +89,16 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
       : null
     const universal = universalCustom || buildUniversalPrompt(language)
     const sceneParams = buildSceneParams(sceneCtx, language)
-    const fullPrompt = [profGuidance, universal, sceneParams, sceneNotes].filter(Boolean).join('\n\n')
+    const diversityText = getDiversityText(diversityLevel, language)
+
+    // Build goal as a concise directive (guidance is already in universal preset)
+    const goalLine = params.goal?.trim()
+      ? (language === 'ja'
+        ? `【会話目標】${params.goal.trim()}`
+        : `CONVERSATION GOAL: ${params.goal.trim()}`)
+      : ''
+
+    const fullPrompt = [profGuidance, goalLine, universal, diversityText, sceneParams, sceneNotes].filter(Boolean).join('\n\n')
 
     conversationContextRef.current = {
       scenario: params.scenario,

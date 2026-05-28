@@ -143,6 +143,55 @@
   gap: 6px;
 }
 
+/* ── Diversity slider ────────────────────────────────────────────────── */
+.spm-diversity-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-blue, #1677ff);
+  min-width: 16px;
+  text-align: center;
+}
+
+.spm-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.spm-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-color, #ddd);
+  outline: none;
+  cursor: pointer;
+}
+
+.spm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-blue, #1677ff);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.spm-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.spm-slider-label {
+  font-size: 11px;
+  color: var(--text-tertiary, #999);
+  white-space: nowrap;
+  user-select: none;
+}
+
 /* ── Label row (label + action button) ──────────────────────────────── */
 .spm-label-row {
   display: flex;

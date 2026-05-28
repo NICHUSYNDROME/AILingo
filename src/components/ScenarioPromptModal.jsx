@@ -6,6 +6,7 @@ import {
   getUniversalPrompt, setUniversalPrompt, deleteUniversalPrompt,
   getScenePrompt, setScenePrompt, deleteScenePrompt,
   getSceneDesc, setSceneDesc,
+  getDiversity, setDiversity,
   addCustomScenario, renameCustomScenario,
 } from '../utils/scenarioStore'
 import './ScenarioPromptModal.css'
@@ -43,6 +44,9 @@ export default function ScenarioPromptModal({
 
   // Description (brief context for AI generation)
   const [description, setDescription] = useState('')
+
+  // Diversity slider (0=stable  →  4=lively)
+  const [diversity, setDiversityState] = useState(2)
 
   // Scenario-specific prompt
   const [scenePrompt, setScenePromptState] = useState('')
@@ -110,8 +114,13 @@ export default function ScenarioPromptModal({
       getSceneDesc(language, scenarioValue).then(saved => {
         setDescription(saved || '')
       })
+      // Load saved diversity level
+      getDiversity(language, scenarioValue).then(level => {
+        setDiversityState(level)
+      })
     } else {
       setScenePromptState('')
+      setDiversityState(2) // default for new scenarios
     }
   }, [isOpen, isNew, scenarioValue, scenarioLabel, language, proficiencyScore])
 
@@ -192,18 +201,15 @@ export default function ScenarioPromptModal({
     }
 
     await setSceneDesc(language, actualValue, description)
+    await setDiversity(language, actualValue, diversity)
     await setUniversalPrompt(language, universalPrompt)
 
     setSavedIndicator(true)
     setTimeout(() => onClose(), 600)
-  }, [isNew, name, scenarioLabel, scenarioValue, isPreset, scenePrompt, description, universalPrompt, language, onScenarioCreated, onScenarioRenamed, onClose, t])
+  }, [isNew, name, scenarioLabel, scenarioValue, isPreset, scenePrompt, description, diversity, universalPrompt, language, onScenarioCreated, onScenarioRenamed, onClose, t])
 
   const handleClose = useCallback(() => {
     onClose()
-  }, [onClose])
-
-  const handleOverlayClick = useCallback((e) => {
-    if (e.target === e.currentTarget) onClose()
   }, [onClose])
 
   // Escape key to close
@@ -224,7 +230,7 @@ export default function ScenarioPromptModal({
     universalPrompt.trim() !== universalPreset.trim()
 
   return (
-    <div className="spm-overlay" onClick={handleOverlayClick}>
+    <div className="spm-overlay">
       <div className="spm-card">
         {/* Header */}
         <div className="spm-header">
@@ -261,6 +267,26 @@ export default function ScenarioPromptModal({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+        </div>
+
+        {/* Diversity slider */}
+        <div className="spm-field">
+          <div className="spm-label-row">
+            <label className="spm-label">{t('diversityLabel')}</label>
+            <span className="spm-diversity-value">{diversity}</span>
+          </div>
+          <div className="spm-slider-row">
+            <span className="spm-slider-label">{t('diversityStable')}</span>
+            <input
+              type="range"
+              className="spm-slider"
+              min="0"
+              max="4"
+              value={diversity}
+              onChange={(e) => setDiversityState(parseInt(e.target.value, 10))}
+            />
+            <span className="spm-slider-label">{t('diversityLively')}</span>
+          </div>
         </div>
 
         {/* Scenario-Specific Prompt (main editing area) */}
@@ -314,11 +340,9 @@ export default function ScenarioPromptModal({
               placeholder={universalPreset}
               rows={6}
             />
-            {hasUniversalCustom && (
-              <button className="spm-btn spm-btn-reset spm-universal-reset" onClick={handleResetUniversal}>
-                {t('resetPromptToDefault')}
-              </button>
-            )}
+            <button className="spm-btn spm-btn-reset spm-universal-reset" onClick={handleResetUniversal}>
+              {t('resetPromptToDefault')}
+            </button>
           </div>
         </details>
 
@@ -343,33 +367,38 @@ export default function ScenarioPromptModal({
                 <button className="spm-close-btn" onClick={() => setHelpOpen(false)}>✕</button>
               </div>
               <div className="spm-help-body">
-                <p className="spm-help-intro">最终发送给 AI 的 System Prompt 由以下四部分按顺序拼接而成：</p>
+                <p className="spm-help-intro">最终发送给 AI 的 System Prompt 由以下五部分按顺序拼接而成：</p>
 
                 <div className="spm-help-block">
                   <h4>① 水平指导（自动生成）</h4>
-                  <p>根据用户的当前水平分（proficiency score）动态生成，<strong>不在任何编辑窗口中显示</strong>。包含当前级别描述、适应策略和 i+1 目标。每次对话开始时由程序自动注入。</p>
+                  <p>根据用户的当前水平分动态生成，<strong>不在任何编辑窗口中显示</strong>。包含当前级别描述、适应策略和 i+1 目标。每次对话开始时由程序自动注入。</p>
                 </div>
 
                 <div className="spm-help-block">
                   <h4>② 通用设定 / Universal Settings（手动编辑）</h4>
-                  <p>对应弹窗底部的 <strong>「共通設定（役割・スタイル・ルール）」</strong> 折叠面板。包含 AI 的角色定义、人格特征、会话风格、语言规则和禁止事项。默认为预制的通用设定，展开后可编辑。修改后按语言全局生效。</p>
+                  <p>对应弹窗底部的 <strong>{t('universalPromptLabel')}</strong> 折叠面板。包含 AI 的角色定义、人格特征、会话风格、目标引导指令、语言规则和禁止事项。默认为预制的通用设定，展开后可编辑。修改后按语言全局生效。目标引导指令为预设，实际对话目标（内容）由程序动态注入。</p>
                 </div>
 
                 <div className="spm-help-block">
-                  <h4>③ 场景参数（自动生成）</h4>
-                  <p>根据下方 Scenario Setup 表单中的设置自动生成，<strong>不在任何编辑窗口中显示</strong>。包含：场景名、订正感度、目标知识点数、最大轮次、多样性规则、对话目标。</p>
+                  <h4>③ 多样性 / Diversity（滑块控制）</h4>
+                  <p>对应弹窗中部的 <strong>{t('diversityLabel')}</strong> 滑块。控制 AI 回复的丰富程度：0（{t('diversityStable')}）= 每次相同的开头和风格；4（{t('diversityLively')}）= 每次必须不同的具体情境、细节和开场方式。每个场景独立保存。</p>
                 </div>
 
                 <div className="spm-help-block">
-                  <h4>④ 场景笔记 / Scene Notes（手动编辑）</h4>
-                  <p>对应弹窗中的 <strong>「シーンノート（役割・会話の流れ）（Scene Notes）」</strong> 编辑框。用于描述该场景下 AI 的角色扮演细节、会话流程和关键短语。<strong>不需要写</strong>订正感度、知识点数等参数（这些由场景参数自动生成）。</p>
+                  <h4>④ 场景参数（自动生成）</h4>
+                  <p>根据下方 Scenario Setup 表单中的设置自动生成，<strong>不在任何编辑窗口中显示</strong>。包含：场景名、订正感度、目标知识点数、最大轮次、对话目标。</p>
+                </div>
+
+                <div className="spm-help-block">
+                  <h4>⑤ 场景笔记 / Scene Notes（手动编辑）</h4>
+                  <p>对应弹窗中的 <strong>{t('scenePromptLabel')}</strong> 编辑框。用于描述该场景下 AI 的角色扮演细节、会话流程和关键短语。<strong>不需要写</strong>订正感度、知识点数等参数（这些由场景参数自动生成）。</p>
                   <p className="spm-help-eg">示例格式：<br/>役割: 你是餐厅服务员<br/>会话流程: 迎客→介绍菜单→点单→确认→结账<br/>关键短语: 「欢迎光临」「今天推荐…」</p>
                 </div>
 
                 <div className="spm-help-block spm-help-final">
                   <h4>最终拼接结果</h4>
-                  <code>水平指导 + 通用设定 + 场景参数 + 场景笔记</code>
-                  <p style={{marginTop:8}}>四部分之间以空行分隔。用户自定义的内容会覆盖对应部分的预制默认值。</p>
+                  <code>水平指导 + 通用设定 + 多样性 + 场景参数 + 场景笔记</code>
+                  <p style={{marginTop:8}}>五部分之间以空行分隔。用户自定义的内容会覆盖对应部分的预制默认值。</p>
                 </div>
               </div>
             </div>

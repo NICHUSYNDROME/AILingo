@@ -143,3 +143,51 @@ export async function setSceneDesc(lang, scenarioValue, desc) {
   }
   await setItem(sceneDescKey(lang, scenarioValue), desc.trim())
 }
+
+// ── Scene Diversity Level (slider 0-4) ───────────────────────────────
+
+function diversityKey(lang, scenarioValue) {
+  return `custom_diversity_${lang}_${scenarioValue}`
+}
+
+export async function getDiversity(lang, scenarioValue) {
+  try {
+    const raw = await getItem(diversityKey(lang, scenarioValue))
+    if (raw === null) return 2 // default: balanced
+    const n = parseInt(raw, 10)
+    return isNaN(n) ? 2 : Math.max(0, Math.min(4, n))
+  } catch {
+    return 2
+  }
+}
+
+export async function setDiversity(lang, scenarioValue, level) {
+  const n = Math.max(0, Math.min(4, level))
+  await setItem(diversityKey(lang, scenarioValue), String(n))
+}
+
+const DIVERSITY_LABELS = {
+  en: [
+    'Be consistent and predictable. Use the same style and opening approach every time.',
+    'Mild variation. Occasionally change phrasing, but keep the structure similar.',
+    'Natural variation. Vary responses and avoid repeating the same opening lines.',
+    'Be creative. Use different opening scenarios, different details, and varied expressions each time.',
+    'MAX creativity. Every conversation must start differently — vary the specific situation, location, problem, mood, and details. Never repeat the same scenario setup.',
+  ],
+  ja: [
+    '一貫性を重視。毎回同じスタイル・同じ切り出し方で返答してください。',
+    '軽い変化を。時々言い回しを変えますが、構造は似たままに。',
+    '自然な変化を。返答を多様にし、同じ出だしを繰り返さないでください。',
+    '創造的に。毎回異なる切り出し方、異なる具体的状況、異なる表現を使ってください。',
+    '最大の創造性。毎回必ず異なる会話の始まり方に——具体的な場所・問題・雰囲気・詳細を変え、同じシチュエーション設定を二度と繰り返さないでください。',
+  ],
+}
+
+export function getDiversityText(level, language = 'en') {
+  const labels = DIVERSITY_LABELS[language] || DIVERSITY_LABELS.en
+  const label = labels[Math.max(0, Math.min(4, level))] || labels[2]
+  const prefix = language === 'ja'
+    ? `多様性レベル ${level}`
+    : `Diversity level ${level}`
+  return `${prefix}: ${label}`
+}
