@@ -8,6 +8,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- 开发环境：从 Electron 生产数据单向同步到浏览器 localStorage（仅填充不存在的 key，不覆盖已有数据） -->
+    <script>
+      (async () => {
+        try {
+          const resp = await fetch('/__dev_settings.json')
+          if (!resp.ok) return
+          const settings = await resp.json()
+          let count = 0
+          for (const [key, value] of Object.entries(settings)) {
+            if (localStorage.getItem(key) === null) {
+              localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value))
+              count++
+            }
+          }
+          if (count > 0) console.log('%c✅ 已从生产环境同步 ' + count + ' 项数据到测试环境', 'color:green')
+        } catch (_) {}
+      })()
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

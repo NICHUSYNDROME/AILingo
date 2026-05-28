@@ -28,6 +28,9 @@ dist-ssr
 release/
 *.app
 
+# Dev settings (one-way sync from production, never commit)
+public/__dev_settings.json
+
 # Custom agent definitions (workspace-level)
 .github/agents/
 

@@ -6,7 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "dev:browser": "bash -c 'trap \"kill 0\" EXIT; node server/tts-server.cjs & vite'",
+    "dev:browser": "bash scripts/sync-dev-settings.sh && bash -c 'trap \"kill 0\" EXIT; node server/tts-server.cjs & vite'",
     "dev:electron": "NODE_ENV=development electron electron/main.cjs",
     "build": "vite build",
     "lint": "eslint .",
