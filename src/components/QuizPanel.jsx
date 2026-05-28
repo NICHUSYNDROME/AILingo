@@ -26,16 +26,25 @@ function getQuizSystemPrompt(language) {
   if (language === 'ja') {
     return `You are a Japanese quiz generator. Based on the provided knowledge point list, generate a mixed-type quiz.
 
-Question types include:
-- choice: Multiple choice (4 options, single correct answer)
-- fill: Fill in the blank
-- spelling: Spelling (show a kanji word, user types its hiragana reading)
+Question types:
+- fill: Fill in the blank (sentence with _____, user types the missing word/phrase)
 - correction: Error correction (show a sentence with an error, user provides the corrected version)
+- spelling: Reading quiz (漢字の読み方) — ONLY for knowledge points whose type is "word" (単語) AND the word contains at least one KANJI character (漢字). The question shows the kanji word, user types its hiragana reading.
+- joshi: Particle quiz — test the user's knowledge of Japanese particles (助詞: は/が/を/に/で/と/へ/から/まで/より/の/も/か/や/し/ね/よ etc.)
+
+CRITICAL spelling rules:
+- ONLY generate spelling for knowledge points where type="word" AND the word contains 漢字.
+- NEVER generate spelling for: phrases (type="phrase"), grammar (type="grammar"), particles (type="joshi"), keigo (type="keigo"), conjugations (type="katsuyou").
+- NEVER generate spelling for pure katakana words like ポーター, レストラン, チェックイン.
+- NEVER generate spelling for pure hiragana words like ありがとう, ください.
+- If a word has BOTH kanji and kana (e.g., 食べる, 大盛り, 朝食), spelling IS allowed.
+- Never ask the user to write kanji — always show kanji and test the hiragana reading.
 
 Rules:
-- Generate 1 question per knowledge point.
-- Maximum 10 questions total.
-- If there are fewer than 10 knowledge points, generate questions for all of them.
+- Generate 1 question per knowledge point from the provided list.
+- Minimum 8 questions, maximum 10 questions.
+- If there are fewer than 8 knowledge points, you MUST generate supplementary questions (especially joshi and fill types using common JLPT N5-N4 grammar) to reach at least 8 questions.
+- For supplementary questions (not tied to a knowledge point), set "knowledgePointId" to an empty string "".
 - Return ONLY valid JSON, no other text.
 - Use double quotes only.
 
@@ -43,23 +52,34 @@ JSON format:
 {
   "questions": [
     {
-      "type": "choice" | "fill" | "spelling" | "correction",
-      "question": "Question text",
+      "type": "fill" | "correction" | "spelling" | "joshi",
+      "joshiType": "fill" | "choice",
+      "question": "Question text (JAPANESE ONLY, no Chinese in this field)",
+      "hint": "Chinese hint explaining meaning/context (中文提示)",
       "options": ["A. option1", "B. option2", "C. option3", "D. option4"],
       "answer": "Correct answer",
-      "knowledgePointId": "the id string of the knowledge point"
+      "knowledgePointId": "the id string of the knowledge point, or empty string for supplementary questions"
     }
   ]
 }
 
-For choice type: provide exactly 4 options in the options array. Questions and options should be in Japanese.
-For fill type: use _____ to indicate the blank. Include a hint in CHINESE (not Japanese) in parentheses, indicating the required word type, meaning, or reading. Example: '毎日日本語を_____。 (中文提示：学习)' -> answer: '勉強します'
-For spelling type in Japanese: Show a kanji word and ask the user to type its correct reading in hiragana. The question should contain the kanji word and optionally the English/Chinese meaning. The answer should be in hiragana only. Example: question: '食べる (to eat)', answer: 'たべる'. Never ask the user to write kanji from hiragana.
+IMPORTANT about "question" and "hint" fields:
+- The "question" field MUST contain ONLY Japanese text. Do NOT put Chinese hints, parenthetical explanations, or English in the question field.
+- Put ALL Chinese hints/meanings/explanations in the separate "hint" field instead.
+- For spelling type, the hint should be the Chinese meaning of the word (e.g., "早餐", "大份").
+- For fill and joshi types, the hint should explain what the sentence means in Chinese, so the user understands the context.
 
-日本語のスペリング問題では、必ず漢字を見せて、読み方（ひらがな）を答えさせる形式にしてください。漢字を書かせる問題は出さないでください。
-For correction type: show the incorrect sentence in the question field, and the corrected version in the answer field. Do NOT include options. In the question field, add a prompt in CHINESE describing what needs to be corrected. Example: question: '進捗はいいです。 (请使用更自然的日文表达)', answer: '進捗は順調です。'
+For fill type: use _____ to indicate the blank. question='毎日日本語を_____。', hint='学习', answer='勉強します'
 
-Distribute question types evenly: roughly 25% choice, 25% fill, 25% spelling, 25% correction. Adjust based on knowledge point types.`
+For correction type: show the incorrect sentence in the question field, and the corrected version in the answer field. Do NOT include options. The correction instruction goes in the hint field. Example: question='進捗はいいです。', hint='请使用更自然的日文表达', answer='進捗は順調です。'
+
+For spelling type: question is just the kanji word (no extra text), hint is the Chinese meaning. Example: question='食べる', hint='吃', answer='たべる'
+
+For joshi type: you MUST set the "joshiType" field.
+  - joshiType "fill": question='私_____学生です。', hint='我是学生', answer='は'
+  - joshiType "choice": question='電車_____学校に行きます。', hint='坐电车去学校', options=["A. は", "B. で", "C. を", "D. が"], answer="B. で"
+
+Distribute question types: roughly 25% fill, 25% correction, 25% spelling (kanji words only), 25% joshi. Adjust based on available knowledge point types. If there aren't enough eligible kanji words for spelling, increase joshi and fill proportions instead — NEVER force a spelling question on a non-kanji word.`
   }
 
   return `You are an English quiz generator. Based on the provided knowledge point list, generate a mixed-type quiz.
@@ -100,7 +120,7 @@ Distribute question types evenly: roughly 25% choice, 25% fill, 25% spelling, 25
 
 function getReviewSystemPrompt(language) {
   if (language === 'ja') {
-    return `You are a Japanese quiz reviewer. Review the user's answers to subjective questions (fill-in-the-blank and error correction).
+    return `You are a Japanese quiz reviewer. Review the user's answers to subjective questions (fill-in-the-blank, error correction, and joshi-fill).
 
 For each subjective question, determine if the answer is correct or incorrect, and provide a brief explanation in Japanese.
 
@@ -117,9 +137,10 @@ JSON format:
   ]
 }
 
-Only include questions of type 'fill' or 'correction' in the reviews array.
+Only include questions of type 'fill', 'correction', or 'joshi' (where joshiType is 'fill') in the reviews array.
 For 'fill' type: consider the answer correct if the key word/phrase matches, ignoring minor spacing or script differences (hiragana/katakana/kanji).
-For 'correction' type: consider the answer correct if the user's correction fixes the error in the sentence.`
+For 'correction' type: consider the answer correct if the user's correction fixes the error in the sentence.
+For 'joshi' type with joshiType 'fill': the answer is a single particle. Consider it correct if the particle matches exactly. Be lenient with particle variants (e.g., には vs は when context allows).`
   }
 
   return `You are an English quiz reviewer. Review the user's answers to subjective questions (fill-in-the-blank and error correction).
@@ -197,6 +218,8 @@ function getTypeLabel(type, t) {
       return t('quizSpelling')
     case 'correction':
       return t('quizErrorCorrection')
+    case 'joshi':
+      return t('quizJoshi')
     default:
       return type
   }
@@ -263,9 +286,15 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       }
 
       if (quizPoints.length === 0) {
-        setError(t('quizNoPointsDue'))
-        setLoading(false)
-        return
+        // For Japanese, allow generating supplementary questions even without due knowledge points
+        if (language === 'ja') {
+          setError(null)
+          // fall through to generate supplementary-only quiz
+        } else {
+          setError(t('quizNoPointsDue'))
+          setLoading(false)
+          return
+        }
       }
 
       // Build knowledge point list for the prompt
@@ -289,7 +318,9 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
             { role: 'system', content: getQuizSystemPrompt(language) },
             {
               role: 'user',
-              content: `Generate a quiz for these knowledge points (max 10 questions):\n${JSON.stringify(pointsForPrompt, null, 2)}`,
+              content: language === 'ja'
+                ? `Generate a Japanese quiz (min 8, max 10 questions). Language: Japanese.\nKnowledge points for reference:\n${JSON.stringify(pointsForPrompt, null, 2)}\n\n${quizPoints.length < 8 ? 'Since there are fewer than 8 knowledge points, please generate supplementary questions (especially joshi and common JLPT N5-N4 grammar fill questions) to reach at least 8 total questions. For supplementary questions, set knowledgePointId to "".' : ''}`
+                : `Generate a quiz for these knowledge points (max 10 questions):\n${JSON.stringify(pointsForPrompt, null, 2)}`,
             },
           ],
           stream: false,
@@ -366,7 +397,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
       questions.forEach((q, idx) => {
         const userAnswer = answers[idx] || ''
-        if (q.type === 'choice') {
+        if (q.type === 'choice' || (q.type === 'joshi' && q.joshiType === 'choice')) {
           const isCorrect = extractOptionLetter(userAnswer) === extractOptionLetter(q.answer)
           if (isCorrect) correctCount++
           const correctLetter = extractOptionLetter(q.answer)
@@ -389,7 +420,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
               : `${t('quizCorrectAnswer')}${q.answer}`,
           })
         } else {
-          // fill or correction — send to AI for review
+          // fill, correction, or joshi-fill — send to AI for review
           subjectiveQuestions.push({ index: idx, question: q, userAnswer })
         }
       })
@@ -589,7 +620,13 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
                   <div className="quiz-review-question">{q.question}</div>
 
-                  {q.type === 'choice' && q.options && (
+                  {q.hint && (
+                    <div className="quiz-q-hint" style={{ marginBottom: 8 }}>
+                      💡 {q.hint}
+                    </div>
+                  )}
+
+                  {(q.type === 'choice' || (q.type === 'joshi' && q.joshiType === 'choice')) && q.options && (
                     <div className="quiz-review-options">
                       {q.options.map((opt, oi) => {
                         const optLetter = extractOptionLetter(opt)
@@ -732,9 +769,9 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                   value={answers[idx] || ''}
                   onChange={(e) => handleAnswer(idx, e.target.value)}
                 />
-                {extractFillHint(q.question) && (
+                {(q.hint || extractFillHint(q.question)) && (
                   <div className="quiz-q-hint">
-                    💡 {extractFillHint(q.question)}
+                    💡 {q.hint || extractFillHint(q.question)}
                   </div>
                 )}
               </div>
@@ -750,6 +787,54 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                   value={answers[idx] || ''}
                   onChange={(e) => handleAnswer(idx, e.target.value)}
                 />
+                {q.hint && (
+                  <div className="quiz-q-hint">
+                    💡 {q.hint}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Joshi type */}
+            {q.type === 'joshi' && q.joshiType === 'choice' && q.options && (
+              <div className="quiz-q-options">
+                {q.options.map((opt, oi) => (
+                  <label key={oi} className="quiz-q-option-label">
+                    <input
+                      type="radio"
+                      name={`q-${idx}`}
+                      value={opt}
+                      checked={answers[idx] === opt}
+                      onChange={() => handleAnswer(idx, opt)}
+                      className="quiz-q-radio"
+                    />
+                    <span className="quiz-q-option-text">{opt}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {q.type === 'joshi' && q.joshiType === 'fill' && (
+              <div className="quiz-q-input-area">
+                <input
+                  type="text"
+                  className="quiz-q-input"
+                  placeholder={t('quizJoshiPlaceholder')}
+                  value={answers[idx] || ''}
+                  onChange={(e) => handleAnswer(idx, e.target.value)}
+                />
+                {(q.hint || extractFillHint(q.question)) && (
+                  <div className="quiz-q-hint">
+                    💡 {q.hint || extractFillHint(q.question)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Joshi choice hint */}
+            {q.type === 'joshi' && q.joshiType === 'choice' && q.hint && (
+              <div className="quiz-q-hint" style={{ marginTop: 4 }}>
+                💡 {q.hint}
               </div>
             )}
 

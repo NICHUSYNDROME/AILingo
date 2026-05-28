@@ -79,6 +79,8 @@
   "quizFillBlank": "穴埋め問題",
   "quizSpelling": "スペリング",
   "quizErrorCorrection": "誤り訂正",
+  "quizJoshi": "助詞",
+  "quizJoshiPlaceholder": "助詞を入力...",
   "quizApiKeyMissing": "有効なAPIキーを入力してください。",
   "quizNoPointsDue": "復習待ちの単語がありません。",
   "quizApiKeyInvalid": "APIキーが無効または期限切れです。",

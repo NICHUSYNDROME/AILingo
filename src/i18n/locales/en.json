@@ -79,6 +79,8 @@
   "quizFillBlank": "Fill in the Blank",
   "quizSpelling": "Spelling",
   "quizErrorCorrection": "Error Correction",
+  "quizJoshi": "Particle",
+  "quizJoshiPlaceholder": "Type the particle...",
   "quizApiKeyMissing": "Please provide a valid API Key first.",
   "quizNoPointsDue": "No knowledge points due for review.",
   "quizApiKeyInvalid": "API Key is invalid or expired.",
