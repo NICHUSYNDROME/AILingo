@@ -256,17 +256,18 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
   const prevScore = ctx?.proficiencyScore
 
   // Build score context line — pass actual previous score so AI can compute meaningful scoreChange
+  // P1-2: 日语版总结改用中文输出，便于学习者阅读
   const jaPrevScoreLine = (prevScore !== null && prevScore !== undefined && !isAssessment)
-    ? `前回のスコア（${prevScore.toFixed(2)}）を基準に変化を測ってください。\n`
-    : '前回のスコア（もしあれば）を基準に変化を測ってください。\n'
+    ? `上次得分（${prevScore.toFixed(2)}）作为基准来衡量变化。\n`
+    : '以上次得分（如有）作为变化参考。\n'
 
   const enPrevScoreLine = (prevScore !== null && prevScore !== undefined && !isAssessment)
     ? `The learner's previous proficiency score was ${prevScore.toFixed(2)}. Use it as a baseline to compute scoreChange.\n`
     : 'Use the previous score (if available) as a reference for the change.\n'
 
   const systemPrompt = language === 'ja'
-    ? 'あなたは' + (isAssessment ? '日本語能力評価の専門家です。この会話はレベル診断テストです。' : '日本語学習分析の専門家です。') + '会話履歴に基づいて、' + (isAssessment ? '診断レポート' : '構造化された学習サマリー') + 'を生成してください。\n' +
-      'JSON 形式で返してください。他のテキストは不要です：\n' +
+    ? '你是一名日语学习分析专家。根据学习者的发言记录，生成结构化的学习总结。\n' +
+      '返回 JSON 格式，不要其他文字：\n' +
       '{\n' +
       '  completion: { rating: string, detail: string },\n' +
       '  strengths: [{ point: string }],\n' +
@@ -281,44 +282,44 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       '  }\n' +
       '}\n' +
       '\n' +
-      '各フィールドの説明：\n' +
-      '- completion.rating: 簡潔な評価（例：「優秀」「良好」「基本的に完了」）\n' +
-      '- completion.detail: 達成状況の詳細説明（1-2文、日本語）\n' +
-      '- strengths: 良かった点、各 point は一文で。必ず1つ以上書くこと。\n' +
-      '- weaknesses: 改善が必要な文法ポイント、各 point は問題説明、example は会話中の誤りの例\n' +
-      '- newKnowledge: 新しい知識、各 word は日本語の単語、meaning は日本語での説明\n' +
-      '- suggestions: 学習アドバイス、各 suggestion は一文で。必ず1つ以上書くこと。\n' +
+      '各字段说明：\n' +
+      '- completion.rating: 简短评价（如"优秀"/"良好"/"基本完成"）\n' +
+      '- completion.detail: 完成情况详细描述（1-2句中文）\n' +
+      '- strengths: 表现好的地方，每项 point 一句话。必须写至少1项。\n' +
+      '- weaknesses: 需改进的语法点，每项 point 是问题描述，example 是对话中的错误示例\n' +
+      '- newKnowledge: 新知识点，每项 word 保留日语原文，meaning 用中文解释\n' +
+      '- suggestions: 学习建议，每项 suggestion 一句话。必须写至少1项。\n' +
       '\n' +
-      '【習熟度評価の指示】\n' +
-      'proficiencyAssessment は学習者の現在の習熟度を1-10の小数点数で評価します。\n' +
-      '- currentScore: 今回の会話に基づく現在の評価スコア（例: 4.25）\n' +
-      '- scoreChange: 前回と比較した変化量（正=向上、負=低下、0=維持）\n' +
-      '- direction: "up"（向上）、"down"（低下）、または "same"（維持）\n' +
-      '- summary: 習熟度変化の簡潔な説明（日本語で一言。前回と比較した表現を使ってください。例：「前回より語彙力が向上しています」）\n' +
+      '【习熟度评估说明】\n' +
+      'proficiencyAssessment 评估学习者的当前熟练度（1-10 小数）。\n' +
+      '- currentScore: 基于本次对话的当前评估分数（如 4.25）\n' +
+      '- scoreChange: 与上次相比的变化量（正=进步、负=退步、0=持平）\n' +
+      '- direction: "up"（进步）、"down"（退步）、或 "same"（持平）\n' +
+      '- summary: 简短的中文说明（一句话，含对比表述，如"比上次词汇量有提升"）\n' +
       '\n' +
-      '採点の参考: レベル5=サバイバル会話可能、レベル6=基本流暢、レベル7=自立運用\n' +
-      '小さな変化（±0.05〜0.30）を適切に反映してください。\n' +
+      '评分参考：5=生存会话、6=基本流利、7=独立运用\n' +
+      '小幅变化（±0.05～0.30）请适当反映。\n' +
       jaPrevScoreLine +
       (isAssessment
         ? '\n' +
-          '【診断特別指示】\n' +
-          'これは初回レベル診断です。以下の点に注意してください：\n' +
-          '- scoreChange は 0 にしてください（初回評価のため）\n' +
-          '- direction は "same" にしてください\n' +
-          '- 総合スコアに加えて、summaryフィールドに以下の4次元の内訳を含めてください：\n' +
-          '  「語彙: X.X / 文法: X.X / 流暢さ: X.X / 理解力: X.X」\n' +
-          '- 会話の進行に応じて適切なレベルを判断してください\n' +
-          '- レベル1-4: 基本的な文が作れない・単語レベル\n' +
-          '- レベル5-6: 日常会話が可能だが複雑な話題で苦戦\n' +
-          '- レベル7-8: 幅広い話題で自然に会話可能\n' +
-          '- レベル9-10: 母語話者に近い・専門的な運用が可能\n'
+          '【诊断特别指示】\n' +
+          '这是首次水平诊断。请注意以下事项：\n' +
+          '- scoreChange 设为 0（首次评估，无历史基线）\n' +
+          '- direction 设为 "same"\n' +
+          '- 在 summary 字段中附上 4 维度评分明细：\n' +
+          '  「词汇: X.X / 语法: X.X / 流利度: X.X / 理解力: X.X」\n' +
+          '- 根据对话表现判断合适水平：\n' +
+          '- 1-4级：无法构建基本句子，仅单词水平\n' +
+          '- 5-6级：能处理日常对话，但复杂话题有困难\n' +
+          '- 7-8级：能自然应对广泛话题\n' +
+          '- 9-10级：接近母语或专业水平\n'
         : '') +
       '\n' +
-      'すべて日本語で記述してください。各配列は少なくとも1項目含むこと。JSONのみ返してください。\n' +
+      '所有内容用中文撰写（newKnowledge.word 保留日语原文，meaning 用中文解释）。每个数组至少包含 1 项。只返回 JSON。\n' +
       'CRITICAL: Return ONLY the JSON object. Do not add any greeting, explanation, or other text. Start with { and end with {}.'
     : (isAssessment
-      ? 'You are a language proficiency assessment specialist. This conversation was a level diagnostic. Generate a diagnostic report.\n'
-      : '你是英语学习分析专家。根据对话历史，生成结构化的学习总结。\n') +
+      ? 'You are a language proficiency assessment specialist. This conversation was a level diagnostic.\n【重要】以下只包含学习者的发言，请只分析学习者的语言水平，不要评估 AI 助手。\nGenerate a diagnostic report.\n'
+      : '你是英语学习分析专家。根据学习者的发言记录（不含 AI 回复），生成结构化的学习总结。\n【重要】只分析学习者的语言水平，不要评估 AI 助手的内容。\n') +
       '返回 JSON 格式，不要其他文字：\n' +
       '{\n' +
       '  completion: { rating: string, detail: string },\n' +
@@ -372,12 +373,15 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
       'CRITICAL: Return ONLY the JSON object. Do not add any greeting, explanation, or other text. Start with { and end with {}.'
 
   const userContent = language === 'ja'
-    ? '上記の会話に基づいて、日本語学習サマリーを生成してください。'
+    ? '请根据以上学习者的发言，生成日语学习总结。'
     : 'Please generate a Chinese learning summary based on the conversation above.'
+
+  // P1-1: 只分析学习者发言，过滤 AI 回复
+  const userOnlyHistory = conversationHistory.filter(m => m.role === 'user')
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...conversationHistory,
+    ...userOnlyHistory,
     {
       role: 'user',
       content: userContent,
@@ -418,14 +422,14 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
 
       if (!parsed.strengths || parsed.strengths.length === 0) {
         parsed.strengths = language === 'ja'
-          ? [{ point: '会話を最後まで続けることができました' }]
+          ? [{ point: '成功完成了本次对话' }]
           : [{ point: 'Successfully completed the conversation' }]
         needsRepair = true
       }
 
       if (!parsed.suggestions || parsed.suggestions.length === 0) {
         parsed.suggestions = language === 'ja'
-          ? [{ suggestion: '引き続き練習を重ねましょう' }]
+          ? [{ suggestion: '请继续坚持练习，巩固学习成果' }]
           : [{ suggestion: 'Keep practicing to build on your progress' }]
         needsRepair = true
       }
