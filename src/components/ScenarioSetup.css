@@ -315,7 +315,7 @@
 }
 
 /* Narrow mode: stack goal input + button vertically */
-@media (max-width: 899px) {
+@media (max-width: 1029px) {
   .goal-input-row {
     flex-direction: column;
     gap: 6px;

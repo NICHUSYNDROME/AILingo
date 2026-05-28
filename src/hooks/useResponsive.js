@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react'
 /**
  * Hook that returns true when the viewport is narrower than the given breakpoint.
  * Defaults to false (wide) to avoid narrow-mode flash on initial render.
- * @param {number} [breakpoint=900] - Width in pixels
+ * @param {number} [breakpoint=1030] - Width in pixels
  * @returns {boolean}
  */
-export function useResponsive(breakpoint = 900) {
+export function useResponsive(breakpoint = 1030) {
   const [isNarrow, setIsNarrow] = useState(false)
 
   useEffect(() => {

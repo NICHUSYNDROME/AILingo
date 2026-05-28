@@ -131,27 +131,28 @@
 
 /* ===== Sidebar Point Detail (Look Up panel) — migrated to LookUpPanel.css ===== */
 
-/* ===== Center idle state — horizontal layout: TabNav + Content ===== */
+/* ===== Center idle state — TabNav floats on the left, content is centered ===== */
 .center-idle {
   display: flex;
   flex-direction: row;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
-/* Content area fills remaining space */
+/* Content area fills full width, centers its children */
 .idle-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 16px 16px 70px;
 }
 
 /* Narrow-mode idle content — top-aligned with padding */
-@media (max-width: 899px) {
+@media (max-width: 1029px) {
   .idle-content {
     justify-content: flex-start;
     padding: 12px;

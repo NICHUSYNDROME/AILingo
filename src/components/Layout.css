@@ -160,7 +160,7 @@
 /* ═══════════════════════════════════════════════════════════════
    Narrow-screen responsive (≤899px)
    ═══════════════════════════════════════════════════════════════ */
-@media (max-width: 899px) {
+@media (max-width: 1029px) {
   .layout-narrow .layout-left,
   .layout-narrow .layout-right {
     position: fixed;

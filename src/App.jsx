@@ -19,7 +19,7 @@ import './App.css'
 function App() {
   const { language, setLanguage } = useLanguage()
   const { theme, setTheme, followSystem, setFollowSystem } = useTheme()
-  const isNarrow = useResponsive(900)
+  const isNarrow = useResponsive()
 
   // === API Key modal state ===
   const [showApiModal, setShowApiModal] = useState(false)
