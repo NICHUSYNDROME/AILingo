@@ -137,7 +137,7 @@ export async function sendToAI(
 /**
  * Generate a conversation goal based on the selected scenario.
  */
-export async function generateConversationGoal(scenario, language = 'en', proficiencyScore = null) {
+export async function generateConversationGoal(scenario, language = 'en', proficiencyScore = null, context = {}) {
   const apiKey = await getApiKey()
   if (!apiKey) return ''
 
@@ -204,9 +204,20 @@ export async function generateConversationGoal(scenario, language = 'en', profic
 
   const seed = Date.now() % 10000
 
+  const contextStr = context.description
+    ? (language === 'ja'
+      ? `\nシーン説明: ${context.description}`
+      : `\nScene description: ${context.description}`)
+    : ''
+  const notesStr = context.sceneNotes
+    ? (language === 'ja'
+      ? `\nシーンノート（参考）: ${context.sceneNotes}`
+      : `\nScene notes (reference): ${context.sceneNotes}`)
+    : ''
+
   const userContent = language === 'ja'
-    ? `シーン：${scenario}\nランダムシード：${seed}`
-    : `场景：${scenario}\n随机种子：${seed}`
+    ? `シーン：${scenario}${contextStr}${notesStr}\nランダムシード：${seed}`
+    : `场景：${scenario}${contextStr}${notesStr}\n随机种子：${seed}`
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -225,7 +236,7 @@ export async function generateConversationGoal(scenario, language = 'en', profic
         messages,
         temperature: 1.2,
         stream: false,
-        max_tokens: 150,
+        max_tokens: 250,
       }),
     })
 
@@ -508,5 +519,118 @@ export async function checkTaskCompletion(goal, todos, conversationHistory, lang
   } catch (error) {
     debug.error('[checkTaskCompletion] Error:', error)
     return []
+  }
+}
+
+/**
+ * Generate a scenario-specific system prompt using AI.
+ * Called from ScenarioPromptModal when the user clicks "✨ AI Generate".
+ * Only generates the scenario-dependent portion — universal background
+ * (role, personality, rules) is handled separately by buildUniversalPrompt.
+ *
+ * @param {string} scenarioLabel - Human-readable scenario name (e.g. "咖啡店点单")
+ * @param {string} language - Language code ("en" | "ja")
+ * @param {number|null} proficiencyScore - User's current proficiency score
+ * @returns {string} AI-generated scenario prompt, or empty string on failure
+ */
+export async function generateSystemPrompt(scenarioLabel, language = 'en', proficiencyScore = null, description = '') {
+  const apiKey = await getApiKey()
+  if (!apiKey) return ''
+
+  const scoreStr = proficiencyScore !== null ? proficiencyScore.toFixed(1) : 'N/A'
+
+  const systemInstruction = language === 'ja'
+    ? `あなたは日本語教師向けの会話シーン設計アシスタントです。
+ユーザーが指定した会話シーンに合わせて、AI会話パートナー用の「シーン固有の指示」だけを生成してください。
+
+生成する内容（シーン関連部分のみ）：
+- シナリオ名と簡単な状況説明
+- 会話の流れ方（どのように会話を進めるか）
+- シーン特有のロールプレイ要素（店員と客、面接官と応募者など）
+- シーンに適した語彙やフレーズの提案
+- 想定される会話の展開例
+
+含めてはいけないもの（共通設定なので不要）：
+- AIの役割定義（「あなたは〜会話パートナーです」など）
+- 人格・性格設定
+- 言語ルール（「会話はすべて日本語で」など）
+- 禁止事項（タグ使用禁止など）
+- レベル調整の指示
+
+形式：純粋なシーン指示テキストのみを返してください。説明や前置きは不要です。
+【重要】出力は必ず日本語で行ってください。シーン名が中国語で与えられても、すべての指示を日本語で記述してください。
+
+参考フォーマット：
+シナリオ: [シーン名]
+状況: [簡単な状況説明]
+会話の流れ: [自然な会話の進め方]
+ロール: [AIの役割（店員/案内係など）]
+キーフレーズ: [このシーンで使える重要な表現]`
+    : `You are a conversation scene designer for AI language tutors.
+Generate ONLY the scenario-specific instructions for an AI conversation partner based on the given scenario.
+
+Include (scenario-specific only):
+- Scenario name and brief situation description
+- Conversation flow (how the conversation should progress)
+- Role-play elements (e.g., waiter/customer, interviewer/applicant)
+- Key vocabulary or phrases relevant to the scene
+- Expected conversation developments
+
+Do NOT include (these are universal and handled separately):
+- AI role definition ("You are a conversation partner...")
+- Personality/character settings
+- Language rules ("Conduct the entire conversation in English...")
+- Critical prohibitions (no tags, no stage directions, etc.)
+- Level adjustment instructions
+
+Format: Return ONLY the scenario instruction text. No explanations or prefixes.
+CRITICAL: Output in English ONLY. Even if the scenario name is provided in another language (e.g. Chinese), write ALL instructions in English.
+
+Reference format:
+Scenario: [scene name]
+Situation: [brief context]
+Flow: [natural conversation progression]
+Role: [AI's role - server/guide/etc.]
+Key Phrases: [useful expressions for this scene]`
+
+  const descPart = description.trim()
+    ? (language === 'ja'
+      ? `\nシーンの説明: ${description.trim()}`
+      : `\nDescription: ${description.trim()}`)
+    : ''
+
+  const userMessage = language === 'ja'
+    ? `シーン「${scenarioLabel}」のシーン固有指示を生成してください。${descPart}`
+    : `Generate scenario-specific instructions for the "${scenarioLabel}" scene.${descPart}`
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0.8,
+        stream: false,
+        max_tokens: 600,
+      }),
+    })
+
+    if (!response.ok) {
+      debug.warn('[generateSystemPrompt] API request failed:', response.status)
+      return ''
+    }
+
+    const data = await response.json()
+    return data.choices[0].message.content.trim()
+  } catch (error) {
+    debug.warn('[generateSystemPrompt] Failed:', error)
+    return ''
   }
 }

@@ -92,29 +92,111 @@ const L = {
   },
 }
 
-// ── Parameterized template (shared structure, localized strings) ─────────
-function buildPrompt(ctx, t, proficiencyScore = null) {
-  const scenarioName = t.scenarioMap[ctx.scenario] || ctx.scenario || 'Custom'
-  const sensitivityDesc = t.sensitivity[ctx.sensitivity] || t.sensitivity.normal
-  const goalLine = ctx.goal ? `${t.goalPrefix}${ctx.goal}` : ''
+// ── Default scene notes for preset scenarios ────────────────────────────
+// These are pre-filled into the textarea when editing a preset scenario.
+// They describe role-play dynamics, conversation flow, and key phrases —
+// the truly scene-specific content that is NOT covered by sceneParams.
 
-  const lang = ctx.language || 'en'
-  const profGuidance = proficiencyScore !== null
-    ? getProficiencyGuidance(proficiencyScore, lang)
-    : null
+const DEFAULT_SCENE_NOTES = {
+  en: {
+    restaurant: [
+      'Role: You are a server at a restaurant.',
+      'Flow: Greet the customer, present the menu, take their order, ask about preferences or dietary restrictions, handle special requests, and complete the ordering process.',
+      'Key Phrases: "Are you ready to order?", "Today\'s special is...", "Would you like anything to drink?", "How would you like that cooked?"',
+    ].join('\n'),
+    hotel: [
+      'Role: You are a front desk clerk at a hotel.',
+      'Flow: Welcome the guest, handle check-in procedures, ask about room preferences, explain hotel amenities (breakfast hours, WiFi, gym), and address any special requests.',
+      'Key Phrases: "Do you have a reservation?", "How many nights will you be staying?", "Here is your room key.", "Breakfast is served from 7 to 10 AM."',
+    ].join('\n'),
+    business: [
+      'Role: You are a business colleague or client in a meeting.',
+      'Flow: Exchange introductions, discuss the agenda, present ideas or proposals, negotiate terms, handle questions, and wrap up with action items.',
+      'Key Phrases: "Let\'s get started.", "I\'d like to propose...", "What are your thoughts on this?", "Let\'s circle back to that later."',
+    ].join('\n'),
+    casual: [
+      'Role: You are a casual acquaintance or friend.',
+      'Flow: Start with light small talk, share personal stories or opinions, ask about hobbies or weekend plans, react naturally, and keep the conversation relaxed and engaging.',
+      'Key Phrases: "How\'s your week been?", "That sounds interesting!", "What do you do for fun?", "I\'ve been meaning to try that too."',
+    ].join('\n'),
+  },
+  ja: {
+    restaurant: [
+      '役割: あなたはレストランの店員です。',
+      '会話の流れ: 来店客を迎え、メニューを案内し、注文を取り、好みや食事制限を尋ね、特別なリクエストに対応し、注文を完了します。',
+      'キーフレーズ: 「ご注文はお決まりですか？」「本日のおすすめは…」「お飲み物はいかがですか？」「かしこまりました。」',
+    ].join('\n'),
+    hotel: [
+      '役割: あなたはホテルのフロント係です。',
+      '会話の流れ: 宿泊客を迎え、チェックイン手続きを行い、部屋の好みを尋ね、ホテルの設備（朝食時間、Wi-Fi、ジムなど）を説明し、特別なリクエストに対応します。',
+      'キーフレーズ: 「ご予約はございますか？」「何泊のご予定ですか？」「こちらがお部屋のカードキーです。」「朝食は7時から10時までご利用いただけます。」',
+    ].join('\n'),
+    station: [
+      '役割: あなたは駅の窓口係です。',
+      '会話の流れ: 乗客の行き先を確認し、切符の種類（片道・往復・特急など）を案内し、料金を伝え、乗り場や発車時刻を説明します。',
+      'キーフレーズ: 「どちらまでですか？」「片道ですか、往復ですか？」「〇番線から発車します。」「〇時〇分発です。」',
+    ].join('\n'),
+    convenience: [
+      '役割: あなたはコンビニの店員です。',
+      '会話の流れ: 来店客に挨拶し、商品の場所を案内し、会計を行い、袋が必要か尋ね、温めサービスやポイントカードの有無を確認します。',
+      'キーフレーズ: 「いらっしゃいませ。」「袋はご利用になりますか？」「お弁当は温めますか？」「ポイントカードはお持ちですか？」「〇〇円になります。」',
+    ].join('\n'),
+    casual: [
+      '役割: あなたは友達のようなカジュアルな会話相手です。',
+      '会話の流れ: 軽い話題から始め、趣味や週末の予定について話し、自然にリアクションしながら、リラックスした雰囲気で会話を続けます。',
+      'キーフレーズ: 「最近どう？」「へぇ、面白そう！」「趣味は何？」「今度一緒にどう？」',
+    ].join('\n'),
+  },
+}
+
+/**
+ * Get the default scene notes for a preset scenario.
+ * Returns empty string for custom scenarios or unknown values.
+ */
+export function getDefaultSceneNotes(scenarioValue, language = 'en') {
+  const notes = DEFAULT_SCENE_NOTES[language] || DEFAULT_SCENE_NOTES.en
+  return notes[scenarioValue] || ''
+}
+
+// ── Builders: universal + scenario → combined ───────────────────────────
+
+/**
+ * Build the universal (scenario-independent) portion of the system prompt.
+ * Role, personality, style, language rules, critical prohibitions.
+ * Does NOT include proficiency guidance (injected dynamically by program).
+ */
+export function buildUniversalPrompt(language = 'en') {
+  const t = L[language] || L.en
 
   const parts = [
     t.role, '',
-    ...(profGuidance ? [profGuidance, ''] : []),
     'Personality:', ...t.personality.map(s => `- ${s}`), '',
     'Conversation Style:', ...t.style.map(s => `- ${s}`), '',
+    'Language:', ...t.langRules.map(s => `- ${s}`), '',
+    'CRITICAL:', ...t.importantRules.map(s => `- ${s}`),
+  ]
+
+  return parts.filter(Boolean).join('\n')
+}
+
+/**
+ * Build the auto-generated scene parameters block.
+ * These are injected by the program based on form settings —
+ * NOT editable in the scene prompt textarea.
+ */
+export function buildSceneParams(ctx, language = 'en') {
+  if (!ctx) return ''
+  const t = L[language] || L.en
+  const scenarioName = ctx.scenarioLabel || t.scenarioMap[ctx.scenario] || ctx.scenario || 'Custom'
+  const sensitivityDesc = t.sensitivity[ctx.sensitivity] || t.sensitivity.normal
+  const goalLine = ctx.goal ? `${t.goalPrefix}${ctx.goal}` : ''
+
+  const parts = [
     `${t.scenarioLabel}: ${scenarioName}`,
     `${t.sensitivityLabel}: ${sensitivityDesc}`,
     t.knowledgeLabel(ctx),
     t.roundsLabel(ctx), '',
-    'DIVERSITY:', ...t.diversity.map(s => `- ${s}`), '',
-    'Language:', ...t.langRules.map(s => `- ${s}`), '',
-    'CRITICAL:', ...t.importantRules.map(s => `- ${s}`),
+    'DIVERSITY:', ...t.diversity.map(s => `- ${s}`),
     goalLine,
   ]
 
@@ -129,12 +211,23 @@ export function buildSystemPrompt(ctx, language = 'en', proficiencyScore = null)
       : '你是一个友好的英语学习助手。对话全部使用英语。仅在解释语法或生词时短暂使用中文。'
   }
 
+  // If user has set a custom system prompt for this scenario, use it directly
+  if (ctx.customSystemPrompt && ctx.customSystemPrompt.trim()) {
+    return ctx.customSystemPrompt
+  }
+
   // Assessment mode: use the dedicated assessment system prompt
   if (ctx.isAssessment) {
     return getAssessmentSystemPrompt(language)
   }
 
-  const t = L[language] || L.en
-  return buildPrompt(ctx, t, proficiencyScore)
+  const profGuidance = proficiencyScore !== null
+    ? getProficiencyGuidance(proficiencyScore, language)
+    : null
+  const universal = buildUniversalPrompt(language)
+  const sceneParams = buildSceneParams(ctx, language)
+  const sceneNotes = ctx.customSceneNotes || ''
+
+  return [profGuidance, universal, sceneParams, sceneNotes].filter(Boolean).join('\n\n')
 }
 
