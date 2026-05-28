@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { generateConversationGoal } from '../api'
+import { buildUniversalPrompt, buildSceneParams } from '../api/prompts'
+import { getProficiencyGuidance } from '../config/proficiency'
+import { getCustomScenarios, addCustomScenario, deleteCustomScenario, getUniversalPrompt, getScenePrompt, getSceneDesc } from '../utils/scenarioStore'
 
 /**
  * Manages scenario configuration and center panel state machine.
@@ -19,10 +22,16 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
   const [sensitivity, setSensitivity] = useState('normal')
   const [maxRounds, setMaxRounds] = useState(10)
   const [targetKnowledge, setTargetKnowledge] = useState(5)
+  const [customScenarios, setCustomScenarios] = useState([])
 
   const conversationContextRef = useRef(null)
   const conversationIdRef = useRef(0)
   const [conversationKey, setConversationKey] = useState(0)
+
+  // Load custom scenarios when language changes
+  useEffect(() => {
+    getCustomScenarios(language).then(setCustomScenarios)
+  }, [language])
 
   // Reset scenario when language changes
   useEffect(() => {
@@ -31,10 +40,59 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
     setConversationGoal('')
   }, [language, currentScenarios])
 
+  // ── Custom scenario handlers ─────────────────────────────────────
+  const handleAddScenario = useCallback(async (label) => {
+    const newScenario = await addCustomScenario(language, label)
+    setCustomScenarios(prev => [...prev, newScenario])
+    return newScenario
+  }, [language])
+
+  const handleDeleteScenario = useCallback(async (value) => {
+    await deleteCustomScenario(language, value)
+    setCustomScenarios(prev => prev.filter(s => s.value !== value))
+  }, [language])
+
+  // Add to customScenarios state without re-persisting (scenario already saved by modal)
+  const handleAddToCustomScenarios = useCallback((newScenario) => {
+    setCustomScenarios(prev => {
+      if (prev.some(s => s.value === newScenario.value)) return prev
+      return [...prev, newScenario]
+    })
+  }, [])
+
   // ── Transition handlers ──────────────────────────────────────────
-  const handleStartChat = useCallback((params) => {
+  const handleStartChat = useCallback(async (params) => {
+    // Load custom universal + scene notes (if any)
+    const [universalCustom, sceneNotes] = await Promise.all([
+      getUniversalPrompt(language),
+      getScenePrompt(language, params.scenario),
+    ])
+
+    // Build the full prompt programmatically:
+    //   0. proficiency guidance (dynamic, based on user's score)
+    //   1. universal (custom || preset) — role, personality, style, rules
+    //   2. sceneParams (auto-generated from form) — scenario, sensitivity, targets, diversity
+    //   3. sceneNotes (user-edited in modal) — role-play details, flow, key phrases
+    const sceneCtx = {
+      scenario: params.scenario,
+      scenarioLabel: params.scenarioLabel || params.scenario,
+      goal: params.goal || '',
+      sensitivity: params.sensitivity,
+      maxRounds: params.maxRounds,
+      targetKnowledge: params.targetKnowledge,
+      language,
+      isAssessment: false,
+    }
+    const profGuidance = proficiencyScore !== null
+      ? getProficiencyGuidance(proficiencyScore, language)
+      : null
+    const universal = universalCustom || buildUniversalPrompt(language)
+    const sceneParams = buildSceneParams(sceneCtx, language)
+    const fullPrompt = [profGuidance, universal, sceneParams, sceneNotes].filter(Boolean).join('\n\n')
+
     conversationContextRef.current = {
       scenario: params.scenario,
+      scenarioLabel: params.scenarioLabel || params.scenario,
       goal: params.goal || '',
       sensitivity: params.sensitivity,
       maxRounds: params.maxRounds,
@@ -42,6 +100,7 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
       proficiencyScore,
       language,
       isAssessment: false,
+      customSystemPrompt: fullPrompt,
     }
     conversationIdRef.current += 1
     setConversationKey(conversationIdRef.current)
@@ -75,8 +134,21 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
   const handleStartQuiz = useCallback(() => setCenterState('quiz'), [])
   const handleQuizEnd = useCallback(() => setCenterState('idle'), [])
 
-  const handleGenerateGoal = useCallback(async (scenarioValue) => {
-    const rawGoal = await generateConversationGoal(scenarioValue, language, proficiencyScore)
+  const handleGenerateGoal = useCallback(async (scenarioLabel, scenarioValue) => {
+    // Look up scene context (notes + description) for this scenario
+    const [sceneNotes, sceneDesc] = scenarioValue
+      ? await Promise.all([
+          getScenePrompt(language, scenarioValue),
+          getSceneDesc(language, scenarioValue),
+        ])
+      : [null, null]
+
+    const context = {
+      description: sceneDesc || '',
+      sceneNotes: sceneNotes || '',
+    }
+
+    const rawGoal = await generateConversationGoal(scenarioLabel, language, proficiencyScore, context)
     if (!rawGoal) return rawGoal
     // Limit goal count based on proficiency score
     const lines = rawGoal.split('\n').filter(l => l.trim())
@@ -100,6 +172,7 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
     maxRounds, setMaxRounds,
     targetKnowledge, setTargetKnowledge,
     conversationKey,
+    customScenarios,
     // Refs (for ChatArea to read/write)
     conversationContextRef,
     // Handlers
@@ -111,5 +184,8 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
     handleStartAssessment,
     handleSkipAssessment,
     handleAssessmentEnd,
+    handleAddScenario,
+    handleDeleteScenario,
+    handleAddToCustomScenarios,
   }
 }

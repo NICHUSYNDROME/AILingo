@@ -86,6 +86,10 @@ function App() {
     handleStartAssessment,
     handleSkipAssessment,
     handleAssessmentEnd,
+    customScenarios,
+    handleAddScenario,
+    handleDeleteScenario,
+    handleAddToCustomScenarios,
   } = useScenarioState(language, currentScenarios, proficiencyScore)
 
   // === Knowledge points ===
@@ -213,6 +217,10 @@ function App() {
       handleStartAssessment={handleStartAssessment}
       handleSkipAssessment={handleSkipAssessmentWithDefault}
       handleAssessmentEnd={handleAssessmentEnd}
+      customScenarios={customScenarios}
+      handleAddScenario={handleAddScenario}
+      handleDeleteScenario={handleDeleteScenario}
+      handleAddToCustomScenarios={handleAddToCustomScenarios}
       isFirstTime={isFirstTime}
       onClearProficiency={handleClearProficiency}
       onClearKnowledge={handleClearKnowledge}

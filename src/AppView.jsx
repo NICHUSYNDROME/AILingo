@@ -88,6 +88,10 @@ const CenterPanel = memo(function CenterPanel(props) {
                 onStartAssessment={handleStartAssessment}
                 onSkipAssessment={() => handleSkipAssessment()}
                 proficiencyScore={props.proficiencyScore}
+                customScenarios={props.customScenarios}
+                onAddScenario={props.handleAddScenario}
+                onDeleteScenario={props.handleDeleteScenario}
+                onScenarioCreated={props.handleAddToCustomScenarios}
               />)}
             {activeTab === 'review' && (
               <ProgressDashboard
