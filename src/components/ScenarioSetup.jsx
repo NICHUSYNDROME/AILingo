@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect, memo } from 
 import { useTranslation } from 'react-i18next'
 import { SCENARIOS } from '../config/languages'
 import { debug } from '../utils/debug'
+import ScenarioPromptModal from './ScenarioPromptModal'
 import './ScenarioSetup.css'
 
 const ScenarioSetup = memo(function ScenarioSetup({
@@ -22,18 +23,42 @@ const ScenarioSetup = memo(function ScenarioSetup({
   onStartAssessment,
   onSkipAssessment,
   proficiencyScore = null,
+  customScenarios = [],
+  onAddScenario,
+  onDeleteScenario,
+  onScenarioCreated,
 }) {
   const { t } = useTranslation()
   const [showConfirm, setShowConfirm] = useState(false)
   const [confirmError, setConfirmError] = useState('')
   const [goalLoading, setGoalLoading] = useState(false)
-  const [customScenario, setCustomScenario] = useState('')
   const generatingRef = useRef(false)
   const goalTextareaRef = useRef(null)
-  const customInputRef = useRef(null)
 
-  // Get scenarios for current language
-  const currentScenarios = SCENARIOS[language] || SCENARIOS.en
+  // ── Custom dropdown state ──────────────────────────────────────────
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  // ── Prompt modal state ─────────────────────────────────────────────
+  const [promptModalOpen, setPromptModalOpen] = useState(false)
+  const [promptModalTarget, setPromptModalTarget] = useState(null)
+  // isNew: when adding a new scenario, no value/label yet
+  const [promptModalIsNew, setPromptModalIsNew] = useState(false)
+
+  // Build merged scenario list: presets (excluding 'custom') + user custom
+  const presetScenarios = (SCENARIOS[language] || SCENARIOS.en)
+    .filter(s => s.value !== 'custom')
+  const allScenarios = [...presetScenarios, ...customScenarios]
+
+  // Lookup helpers
+  const getScenarioLabel = useCallback((value) => {
+    const found = allScenarios.find(s => s.value === value)
+    return found ? found.label : value
+  }, [allScenarios])
+
+  const isCustomScenario = useCallback((value) => {
+    return customScenarios.some(s => s.value === value)
+  }, [customScenarios])
 
   // Auto-resize textarea to fit content (runs before paint, every render)
   useLayoutEffect(() => {
@@ -55,33 +80,31 @@ const ScenarioSetup = memo(function ScenarioSetup({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Auto-resize the goal textarea based on content
-  const handleGoalInput = useCallback((e) => {
-    onConversationGoalChange(e.target.value)
-  }, [onConversationGoalChange])
+  // Click outside to close dropdown
+  useEffect(() => {
+    if (!dropdownOpen) return
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownOpen])
 
   // Compute effective values: use defaults when input is empty
   const effectiveMaxRounds = maxRounds === '' ? 10 : maxRounds
   const effectiveTargetKnowledge = targetKnowledge === '' ? 5 : targetKnowledge
-
-  // Determine if custom scenario is selected
-  const isCustom = scenario === 'custom'
-
-  // Get the actual scenario value to use (custom text or preset label)
-  const getEffectiveScenario = () => {
-    if (isCustom) return customScenario.trim()
-    const found = currentScenarios.find((s) => s.value === scenario)
-    return found ? found.label : scenario
-  }
 
   // Handle "随机" button click — generate a goal via API and fill the input
   const handleRandomGoal = async () => {
     if (goalLoading || generatingRef.current) return
     generatingRef.current = true
     setGoalLoading(true)
+    const scenarioLabel = getScenarioLabel(scenario)
     debug.proficiency(`[ScenarioSetup] 随机生成目标时评分: ${language.toUpperCase()} = ${proficiencyScore !== null ? proficiencyScore.toFixed(2) : 'N/A'}`)
     try {
-      const goal = await generateGoal(getEffectiveScenario())
+      const goal = await generateGoal(scenarioLabel, scenario)
       if (goal) {
         onConversationGoalChange(goal)
       }
@@ -95,17 +118,12 @@ const ScenarioSetup = memo(function ScenarioSetup({
   const handleStartClick = async () => {
     setConfirmError('')
 
-    // Validate custom scenario
-    if (isCustom && !customScenario.trim()) {
-      setConfirmError(t('validationCustomScenario'))
-      return
-    }
-
     // If input is empty, auto-generate a goal first
     if (!conversationGoal?.trim()) {
       setGoalLoading(true)
       try {
-        const goal = await generateGoal(getEffectiveScenario())
+        const scenarioLabel = getScenarioLabel(scenario)
+        const goal = await generateGoal(scenarioLabel, scenario)
         if (goal) {
           onConversationGoalChange(goal)
         }
@@ -124,7 +142,6 @@ const ScenarioSetup = memo(function ScenarioSetup({
       setConfirmError(t('validationGoal'))
       return
     }
-    // Validate: if effective values are blank (shouldn't happen but safety check)
     if (!effectiveMaxRounds || !effectiveTargetKnowledge) {
       setConfirmError(t('validationMaxRounds'))
       return
@@ -132,10 +149,9 @@ const ScenarioSetup = memo(function ScenarioSetup({
     setShowConfirm(false)
     setConfirmError('')
 
-    const effectiveScenario = getEffectiveScenario()
-
     onStartChat({
-      scenario: isCustom ? effectiveScenario : scenario,
+      scenario: scenario,
+      scenarioLabel: getScenarioLabel(scenario),
       goal: conversationGoal.trim(),
       sensitivity: sensitivity,
       maxRounds: effectiveMaxRounds,
@@ -148,19 +164,57 @@ const ScenarioSetup = memo(function ScenarioSetup({
     setConfirmError('')
   }
 
-  const handleScenarioChange = (value) => {
+  // ── Dropdown handlers ──────────────────────────────────────────────
+
+  const handleSelectScenario = (value) => {
     onScenarioChange(value)
-    // Focus the custom input when switching to custom
-    if (value === 'custom') {
-      setTimeout(() => customInputRef.current?.focus(), 0)
+    setDropdownOpen(false)
+  }
+
+  const handleOpenPromptModal = (e, s) => {
+    e.stopPropagation()
+    setDropdownOpen(false)
+    setPromptModalIsNew(false)
+    setPromptModalTarget({ value: s.value, label: s.label, isPreset: !isCustomScenario(s.value) })
+    setPromptModalOpen(true)
+  }
+
+  const handleDeleteScenario = (e, s) => {
+    e.stopPropagation()
+    if (window.confirm(t('deleteScenarioConfirm'))) {
+      // If deleting the currently selected scenario, switch to first preset
+      if (scenario === s.value) {
+        onScenarioChange(presetScenarios[0]?.value || 'restaurant')
+      }
+      onDeleteScenario?.(s.value)
     }
   }
+
+  const handleStartAddNew = (e) => {
+    e.stopPropagation()
+    setDropdownOpen(false)
+    setPromptModalIsNew(true)
+    setPromptModalTarget(null)
+    setPromptModalOpen(true)
+  }
+
+  const handleScenarioCreated = useCallback((newScenario) => {
+    onScenarioChange(newScenario.value)
+    onScenarioCreated?.(newScenario)
+  }, [onScenarioChange, onScenarioCreated])
+
+  // ── Goal textarea handler ──────────────────────────────────────────
+  const handleGoalInput = useCallback((e) => {
+    onConversationGoalChange(e.target.value)
+  }, [onConversationGoalChange])
+
+  const selectedLabel = getScenarioLabel(scenario)
 
   return (
     <div className="scenario-setup">
       <h2 className="scenario-title">{t('scenarioSetup')}</h2>
 
-      {/* Assessment banner for first-time users — always in Chinese for accessibility */}
+      {/* Assessment banner for first-time users */}
       {isFirstTime && (
         <div className="assessment-banner">
           <div className="assessment-banner-icon">🔍</div>
@@ -186,38 +240,64 @@ const ScenarioSetup = memo(function ScenarioSetup({
       )}
 
       <div className="scenario-fields-wrapper">
-        {/* 场景选择 */}
+        {/* 场景选择 — custom dropdown */}
         <div className="scenario-field">
           <label className="scenario-label">{t('scenario')}</label>
-          <select
-            className="scenario-select"
-            value={scenario}
-            onChange={(e) => handleScenarioChange(e.target.value)}
-          >
-            {currentScenarios.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="scenario-dropdown" ref={dropdownRef}>
+            <button
+              type="button"
+              className="scenario-dropdown-trigger"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            >
+              <span className="scenario-dropdown-label">{selectedLabel}</span>
+              <span className={`scenario-dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>▼</span>
+            </button>
 
-        {/* 自定义场景输入框 — 仅在选择"自定义"时显示 */}
-        {isCustom && (
-          <div className="scenario-field">
-            <label className="scenario-label">
-              {t('customScenarioLabel')}
-            </label>
-            <input
-              ref={customInputRef}
-              type="text"
-              className="scenario-input custom-scenario-input"
-              placeholder={t('customScenarioPlaceholder')}
-              value={customScenario}
-              onChange={(e) => setCustomScenario(e.target.value)}
-            />
+            {dropdownOpen && (
+              <div className="scenario-dropdown-menu">
+                {allScenarios.map((s) => (
+                  <div
+                    key={s.value}
+                    className={`scenario-dropdown-item ${s.value === scenario ? 'selected' : ''}`}
+                    onClick={() => handleSelectScenario(s.value)}
+                  >
+                    <span className="scenario-dropdown-item-name">{s.label}</span>
+                    <div className="scenario-dropdown-item-actions">
+                      <button
+                        type="button"
+                        className="scenario-gear-btn"
+                        onClick={(e) => handleOpenPromptModal(e, s)}
+                        title={t('scenarioSettings')}
+                      >
+                        ⚙️
+                      </button>
+                      {isCustomScenario(s.value) && (
+                        <button
+                          type="button"
+                          className="scenario-delete-btn"
+                          onClick={(e) => handleDeleteScenario(e, s)}
+                          title={t('deleteScenario')}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Divider + Add new */}
+                <div className="scenario-dropdown-divider" />
+
+                <div
+                  className="scenario-dropdown-item scenario-dropdown-add-new"
+                  onClick={handleStartAddNew}
+                >
+                  <span>+ {t('addNewScenario')}</span>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* 对话目标 — textarea + 随机按钮 */}
         <div className="scenario-field">
@@ -301,6 +381,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
         </button>
       </div>
 
+      {/* Confirm dialog overlay */}
       {showConfirm && (
         <div className="confirm-overlay" onClick={handleCancel}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
@@ -310,7 +391,7 @@ const ScenarioSetup = memo(function ScenarioSetup({
             <div className="confirm-body">
               <div className="confirm-item">
                 <span className="confirm-label">{t('scenario')}</span>
-                <span className="confirm-value">{isCustom ? customScenario : (currentScenarios.find((s) => s.value === scenario)?.label || scenario)}</span>
+                <span className="confirm-value">{selectedLabel}</span>
               </div>
               <div className="confirm-item">
                 <span className="confirm-label">{t('conversationGoal')}</span>
@@ -345,6 +426,18 @@ const ScenarioSetup = memo(function ScenarioSetup({
           </div>
         </div>
       )}
+
+      {/* Prompt editing modal */}
+      <ScenarioPromptModal
+        isOpen={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        scenarioValue={promptModalIsNew ? '' : (promptModalTarget?.value || '')}
+        scenarioLabel={promptModalIsNew ? '' : (promptModalTarget?.label || '')}
+        isPreset={!promptModalIsNew && (promptModalTarget?.isPreset ?? true)}
+        language={language}
+        proficiencyScore={proficiencyScore}
+        onScenarioCreated={handleScenarioCreated}
+      />
     </div>
   )
 })
