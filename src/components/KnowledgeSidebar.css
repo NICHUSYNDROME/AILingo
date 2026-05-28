@@ -307,3 +307,154 @@
   background: var(--hover-bg);
   color: var(--text-primary);
 }
+
+/* ===== Search row — input + type filter + batch toggle ===== */
+.kp-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Type filter dropdown */
+.kp-type-filter {
+  flex-shrink: 0;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+  max-width: 90px;
+}
+
+.kp-type-filter:focus {
+  border-color: var(--accent-blue);
+}
+
+/* Batch mode toggle button */
+.kp-batch-toggle {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.kp-batch-toggle:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.kp-batch-toggle.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* ===== Batch mode item ===== */
+.kp-item.kp-batch-item {
+  cursor: pointer;
+}
+
+.kp-item.kp-batch-item:hover {
+  border-color: var(--accent-blue);
+}
+
+/* Batch checkbox */
+.kp-batch-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+}
+
+/* ===== Batch action bar ===== */
+.kp-batch-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.kp-batch-select-btn {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.kp-batch-select-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.kp-batch-count {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.kp-batch-action {
+  flex: 1;
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.kp-batch-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kp-batch-confirm {
+  background: var(--success-bg);
+  color: var(--success-color);
+  border: 1px solid var(--success-border);
+}
+
+.kp-batch-confirm:hover:not(:disabled) {
+  background: var(--success-color);
+  color: #fff;
+}
+
+.kp-batch-delete {
+  background: var(--error-bg);
+  color: var(--error-color);
+  border: 1px solid var(--error-border);
+}
+
+.kp-batch-delete:hover:not(:disabled) {
+  background: var(--error-color);
+  color: #fff;
+}

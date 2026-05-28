@@ -129,9 +129,9 @@ export const TYPE_CONFIG = {
 // 知识类型配置（日文版）
 export const JA_TYPE_CONFIG = {
   word: { label: '単語', color: '#1677ff', bg: '#e6f4ff' },
-  phrase: { label: 'フレーズ', color: '#52c41a', bg: '#f6ffed' },
+  phrase: { label: '慣用句', color: '#52c41a', bg: '#f6ffed' },
   grammar: { label: '文法', color: '#fa8c16', bg: '#fff7e6' },
-  collocation: { label: 'コロケーション', color: '#eb2f96', bg: '#fff0f6' },
+  collocation: { label: '連語', color: '#eb2f96', bg: '#fff0f6' },
   keigo: { label: '敬語', color: '#722ed1', bg: '#f9f0ff' },
   joshi: { label: '助詞', color: '#13c2c2', bg: '#e6fffb' },
   katsuyou: { label: '活用', color: '#f5222d', bg: '#fff1f0' },

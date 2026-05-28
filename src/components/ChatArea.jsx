@@ -16,6 +16,7 @@ import {
 } from '../api'
 import { logActivity } from '../utils/learningLog'
 import { speak, stopSpeaking, isSpeaking, isTTSAvailable } from '../utils/tts'
+import { getLocalDateString } from '../utils/date'
 import './ChatArea.css'
 
 // ===== Helper: escape HTML special chars =====
@@ -490,10 +491,17 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
             !summaryData.newKnowledge || !summaryData.suggestions) {
           summaryData = null
         } else {
-          // Handle proficiency assessment (implicit — debug only, never shown to user)
+          // Handle proficiency assessment
           const pa = summaryData.proficiencyAssessment
-          if (pa && typeof pa.currentScore === 'number' && onProficiencyChange) {
-            onProficiencyChange(pa.currentScore, pa.summary || 'Conversation summary')
+          if (pa && typeof pa.currentScore === 'number') {
+            // Apply 0.05 threshold: changes <= 0.05 are treated as "same"
+            if (pa.scoreChange !== undefined && Math.abs(pa.scoreChange) <= 0.05) {
+              pa.direction = 'same'
+              pa.scoreChange = 0
+            }
+            if (onProficiencyChange) {
+              onProficiencyChange(pa.currentScore, pa.summary || 'Conversation summary')
+            }
             debug.proficiency(
               `[Summary] Proficiency assessment: ${pa.currentScore.toFixed(2)} ` +
               `(${pa.direction === 'up' ? '↑' : pa.direction === 'down' ? '↓' : '→'} ` +
@@ -597,12 +605,11 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         if (existing) {
           // 已存在：重置 SM-2 数据（标记为不熟悉）
           if (onUpdatePoint) {
-            const today = new Date().toISOString().split('T')[0]
             onUpdatePoint(existing.id, {
               repetitions: 0,
               easeFactor: 2.5,
               interval: 0,
-              nextReview: today,
+              nextReview: getLocalDateString(),
               status: 'active',
               confirmed: false
             })
@@ -865,7 +872,22 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       if (!isAssessment) setCorrectionResult(spellCheckResultValue)
 
       const parsed = parseAIReply(agent1Reply)
-      const { mainText, goalAchieved } = parsed
+      let { mainText, goalAchieved } = parsed
+
+      // === 4.1 Fix: 收尾轮 AI 以问号结尾时替换为结束语 ===
+      if (effectiveLastRound) {
+        const endsWithQuestion = /[?？]\s*$/.test(mainText)
+        if (endsWithQuestion) {
+          mainText = mainText.replace(/[?？]\s*$/, '。')
+          if (mainText.trim().length < 10) {
+            const closing = language === 'ja'
+              ? 'これで会話を終わります。練習お疲れ様でした。'
+              : '我们的对话就到这里。继续加油练习吧！'
+            mainText = mainText.trim() + ' ' + closing
+          }
+          debug.log('[ChatArea] 4.1 修复：AI 最后一句以问号结尾，已替换为结束语')
+        }
+      }
 
       let aiMessage
 
@@ -1197,6 +1219,37 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
                       <div className="summary-block-header completion-header"><span className="summary-block-icon">🎯</span><span>任务完成度：{sd.completion.rating}</span></div>
                       <div className="summary-block-body">{sd.completion.detail}</div>
                     </div>
+                    {/* ---- 4.2: 能力评估（仅展示方向，不展示具体分数） ---- */}
+                    {sd.proficiencyAssessment && (
+                      <div className="summary-block">
+                        <div className="summary-block-header proficiency-header">
+                          <span className="summary-block-icon">📊</span>
+                          <span>能力评估</span>
+                        </div>
+                        <div className="summary-block-body">
+                          <div className="summary-list-item">
+                            <span className="summary-bullet">•</span>
+                            <span>
+                              {sd.proficiencyAssessment.scoreChange === 0
+                                ? '首次评估，暂无对比'
+                                : <>
+                                    相比上次：
+                                    <span className={`proficiency-direction ${sd.proficiencyAssessment.direction}`}>
+                                      {sd.proficiencyAssessment.direction === 'up' ? '↑ 进步' : sd.proficiencyAssessment.direction === 'down' ? '↓ 退步' : '→ 保持'}
+                                    </span>
+                                  </>
+                              }
+                            </span>
+                          </div>
+                          {sd.proficiencyAssessment.summary && (
+                            <div className="summary-list-item">
+                              <span className="summary-bullet">•</span>
+                              <span>{sd.proficiencyAssessment.summary}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="summary-block">
                       <div className="summary-block-header strengths-header"><span className="summary-block-icon">✅</span><span>表现好的地方</span></div>
                       <div className="summary-block-body">{sd.strengths.map((s, si) => (<div key={si} className="summary-list-item"><span className="summary-bullet">•</span><span>{s.point}</span></div>))}</div>

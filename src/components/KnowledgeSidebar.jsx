@@ -17,13 +17,28 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   const { t } = useTranslation()
   const typeConfigMap = language === 'ja' ? JA_TYPE_CONFIG : TYPE_CONFIG
   const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('') // '' = all
   const [sortMethod, setSortMethod] = useState('recent')
   const [sortReversed, setSortReversed] = useState(false)
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
   const [newPointIds, setNewPointIds] = useState(new Set())
   const [expandedPointId, setExpandedPointId] = useState(null)  // narrow-mode inline detail
   const [expandedChinese, setExpandedChinese] = useState(false)
   const listRef = useRef(null)
   const prevCountRef = useRef(knowledgePoints.length)
+
+  // Fuzzy search helper: check if all chars of query appear in order in text
+  const fuzzyMatch = useCallback((text, query) => {
+    if (!query) return true
+    const lowerText = text.toLowerCase()
+    const lowerQuery = query.toLowerCase()
+    let qi = 0
+    for (let ti = 0; ti < lowerText.length && qi < lowerQuery.length; ti++) {
+      if (lowerText[ti] === lowerQuery[qi]) qi++
+    }
+    return qi >= lowerQuery.length
+  }, [])
   // Build alphabet index map for the current language（英语用，区分大小写）
   const alphaIndex = useMemo(() => {
     const alphabet = ALPHABETS[language] || ALPHABETS.en
@@ -52,6 +67,31 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
     if (aIdx !== bIdx) return aIdx - bIdx
     return a.word.localeCompare(b.word)
   }, [language, alphaIndex])
+
+  // Display type mapping: joshi/keigo/katsuyou → grammar (for sidebar display only)
+  const displayTypeMap = useMemo(() => {
+    if (language === 'ja') {
+      return { joshi: 'grammar', keigo: 'grammar', katsuyou: 'grammar' }
+    }
+    return {}
+  }, [language])
+
+  const getDisplayType = useCallback((type) => displayTypeMap[type] || type, [displayTypeMap])
+
+  // Type filter options — use display types
+  const typeOptions = useMemo(() => {
+    const seen = new Set()
+    const entries = Object.keys(typeConfigMap)
+      .map(rawType => {
+        const display = getDisplayType(rawType)
+        if (seen.has(display)) return null
+        seen.add(display)
+        return { value: display, label: typeConfigMap[display]?.label || display }
+      })
+      .filter(Boolean)
+    return [{ value: '', label: t('filterTypeAll') }, ...entries]
+  }, [typeConfigMap, getDisplayType, t])
+
   // Detect new points added and scroll to top (new points are inserted at the front)
   useEffect(() => {
     const currentCount = knowledgePoints.length
@@ -90,14 +130,20 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
   const displayPoints = useMemo(() => {
     let filtered = knowledgePoints.filter((p) => p.status !== 'deleted')
 
-    // Search filter
+    // Type filter (using display type)
+    if (typeFilter) {
+      filtered = filtered.filter((p) => getDisplayType(p.type) === typeFilter)
+    }
+
+    // Search filter — fuzzy match on word, meaning, context
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
+      const q = searchQuery.trim()
       filtered = filtered.filter(
         (p) =>
-          p.word.toLowerCase().includes(q) ||
-          p.meaning.toLowerCase().includes(q) ||
-          p.context.toLowerCase().includes(q)
+          fuzzyMatch(p.word, q) ||
+          fuzzyMatch(p.meaning, q) ||
+          fuzzyMatch(p.meaningChinese || '', q) ||
+          fuzzyMatch(p.context, q)
       )
     }
 
@@ -126,7 +172,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
     if (sortReversed) sorted.reverse()
 
     return sorted
-  }, [knowledgePoints, searchQuery, sortMethod, sortReversed, alphaCompare])
+  }, [knowledgePoints, searchQuery, typeFilter, sortMethod, sortReversed, alphaCompare, fuzzyMatch])
 
   const handleSortClick = useCallback((method) => {
     if (sortMethod === method) {
@@ -171,6 +217,49 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
     setExpandedPointId(null)
   }, [])
 
+  // ── Batch mode handlers ──
+  const toggleBatchMode = useCallback(() => {
+    setBatchMode(prev => {
+      if (prev) {
+        setSelectedIds(new Set()) // clear selection on exit
+      }
+      return !prev
+    })
+  }, [])
+
+  const toggleSelectItem = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === displayPoints.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(displayPoints.map(p => p.id)))
+    }
+  }, [displayPoints, selectedIds])
+
+  const batchConfirm = useCallback(() => {
+    selectedIds.forEach(id => onConfirmPoint(id))
+    setSelectedIds(new Set())
+  }, [selectedIds, onConfirmPoint])
+
+  const batchDelete = useCallback(() => {
+    selectedIds.forEach(id => {
+      const point = knowledgePoints.find(p => p.id === id)
+      if (point) onDelete(point)
+    })
+    setSelectedIds(new Set())
+  }, [selectedIds, knowledgePoints, onDelete])
+
   const sortButtons = [
     { key: 'alphabet', label: t('sortAlphabet') },
     { key: 'difficulty', label: t('sortDifficulty') },
@@ -182,15 +271,33 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
     <div className="kp-sidebar">
       <h3 className="kp-sidebar-title">{t('knowledgePoints')}</h3>
 
-      {/* Search bar */}
+      {/* Search bar + Type filter + Batch toggle */}
       <div className="kp-search-bar">
-        <input
-          className="kp-search-input"
-          type="text"
-          placeholder={t('searchPlaceholder')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <div className="kp-search-row">
+          <input
+            className="kp-search-input"
+            type="text"
+            placeholder={t('searchPlaceholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <select
+            className="kp-type-filter"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            {typeOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <button
+            className={`kp-batch-toggle ${batchMode ? 'active' : ''}`}
+            onClick={toggleBatchMode}
+            title={batchMode ? t('batchModeExit') : t('batchMode')}
+          >
+            {batchMode ? '✕' : '⊞'}
+          </button>
+        </div>
       </div>
 
       {/* Sort buttons */}
@@ -206,6 +313,32 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
         ))}
       </div>
 
+      {/* Batch action bar — shown between sort bar and list when batch mode is active */}
+      {batchMode && (
+        <div className="kp-batch-bar">
+          <button className="kp-batch-select-btn" onClick={toggleSelectAll}>
+            {selectedIds.size === displayPoints.length ? t('batchDeselectAll') : t('batchSelectAll')}
+          </button>
+          <span className="kp-batch-count">
+            {selectedIds.size > 0 ? `${selectedIds.size} ${t('batchSelectedCount')}` : ''}
+          </span>
+          <button
+            className="kp-batch-action kp-batch-confirm"
+            disabled={selectedIds.size === 0}
+            onClick={batchConfirm}
+          >
+            {t('batchConfirmSelected')}
+          </button>
+          <button
+            className="kp-batch-action kp-batch-delete"
+            disabled={selectedIds.size === 0}
+            onClick={batchDelete}
+          >
+            {t('batchDeleteSelected')}
+          </button>
+        </div>
+      )}
+
       {/* Knowledge points list */}
       <div className="kp-list" ref={listRef}>
         {displayPoints.length === 0 ? (
@@ -216,7 +349,8 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
           </p>
         ) : (
           displayPoints.map((point) => {
-            const typeCfg = typeConfigMap[point.type] || typeConfigMap.word
+            const displayType = getDisplayType(point.type)
+            const typeCfg = typeConfigMap[displayType] || typeConfigMap.word
             const isConfirmed = point.confirmed === true
             const isNew = newPointIds.has(point.id)
 
@@ -226,15 +360,34 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                 data-point-id={point.id}
                 className={`kp-item ${isConfirmed ? 'kp-confirmed' : 'kp-unconfirmed'} ${
                   selectedPointId === point.id ? 'kp-selected' : ''
-                } ${isNew ? 'kp-new-item' : ''}`}
-                onClick={() => handleSelectPoint(point.id)}
+                } ${isNew ? 'kp-new-item' : ''} ${batchMode ? 'kp-batch-item' : ''}`}
+                onClick={() => {
+                  if (batchMode) {
+                    toggleSelectItem(point.id)
+                  } else {
+                    handleSelectPoint(point.id)
+                  }
+                }}
               >
                 <div className="kp-item-main">
-                  {/* Status dot */}
-                  <span
-                    className={`kp-status-dot ${isConfirmed ? 'kp-dot-confirmed' : 'kp-dot-unconfirmed'}`}
-                    title={isConfirmed ? t('confirmed') : t('pendingConfirmation')}
-                  />
+                  {/* Batch checkbox */}
+                  {batchMode && (
+                    <input
+                      type="checkbox"
+                      className="kp-batch-checkbox"
+                      checked={selectedIds.has(point.id)}
+                      onChange={() => toggleSelectItem(point.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+
+                  {/* Status dot (hide in batch mode) */}
+                  {!batchMode && (
+                    <span
+                      className={`kp-status-dot ${isConfirmed ? 'kp-dot-confirmed' : 'kp-dot-unconfirmed'}`}
+                      title={isConfirmed ? t('confirmed') : t('pendingConfirmation')}
+                    />
+                  )}
 
                   {/* Type tag */}
                   <span
@@ -247,7 +400,7 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                     {typeCfg.label}
                   </span>
 
-                  {/* Word + English meaning preview (50 chars max) */}
+                  {/* Word + meaning preview (50 chars max) */}
                   <div className="kp-item-text">
                     <span className="kp-item-word">{point.word}</span>
                     {(point.type === 'word' || (point.type === 'phrase' && point.phonetic)) && (
@@ -264,25 +417,27 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                     </span>
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="kp-item-actions">
-                    {!isConfirmed && (
+                  {/* Action buttons (hide in batch mode) */}
+                  {!batchMode && (
+                    <div className="kp-item-actions">
+                      {!isConfirmed && (
+                        <button
+                          className="kp-action-btn kp-keep-btn"
+                          onClick={(e) => handleKeepClick(e, point.id)}
+                          title={t('keepTooltip')}
+                        >
+                          {t('keep')}
+                        </button>
+                      )}
                       <button
-                        className="kp-action-btn kp-keep-btn"
-                        onClick={(e) => handleKeepClick(e, point.id)}
-                        title={t('keepTooltip')}
+                        className="kp-action-btn kp-discard-btn"
+                        onClick={(e) => handleDeleteClick(e, point)}
+                        title={t('discardTooltip')}
                       >
-                        {t('keep')}
+                        {t('discard')}
                       </button>
-                    )}
-                    <button
-                      className="kp-action-btn kp-discard-btn"
-                      onClick={(e) => handleDeleteClick(e, point)}
-                      title={t('discardTooltip')}
-                    >
-                      {t('discard')}
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
                 {/* Narrow-mode inline detail */}
                 {isNarrow && expandedPointId === point.id && (

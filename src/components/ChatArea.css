@@ -389,6 +389,27 @@
   color: var(--accent-blue);
 }
 
+/* Proficiency header */
+.proficiency-header {
+  color: #1a73e8;
+}
+
+.proficiency-direction {
+  font-weight: 600;
+}
+
+.proficiency-direction.up {
+  color: var(--success-color);
+}
+
+.proficiency-direction.down {
+  color: var(--warning-color);
+}
+
+.proficiency-direction.same {
+  color: var(--text-secondary);
+}
+
 /* Strengths header */
 .strengths-header {
   color: var(--success-color);

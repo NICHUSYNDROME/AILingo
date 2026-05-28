@@ -52,7 +52,7 @@ JSON format:
 {
   "questions": [
     {
-      "type": "fill" | "correction" | "spelling" | "joshi",
+      "type": "fill" | "correction" | "spelling" | "joshi" | "choice",
       "joshiType": "fill" | "choice",
       "question": "Question text (JAPANESE ONLY, no Chinese in this field)",
       "hint": "Chinese hint explaining meaning/context (中文提示)",
@@ -79,7 +79,9 @@ For joshi type: you MUST set the "joshiType" field.
   - joshiType "fill": question='私_____学生です。', hint='我是学生', answer='は'
   - joshiType "choice": question='電車_____学校に行きます。', hint='坐电车去学校', options=["A. は", "B. で", "C. を", "D. が"], answer="B. で"
 
-Distribute question types: roughly 25% fill, 25% correction, 25% spelling (kanji words only), 25% joshi. Adjust based on available knowledge point types. If there aren't enough eligible kanji words for spelling, increase joshi and fill proportions instead — NEVER force a spelling question on a non-kanji word.`
+Distribute question types: roughly 20% fill, 20% correction, 20% spelling (kanji words only), 20% joshi, 20% choice. 
+- choice type: suitable for grammar-related knowledge points (grammar, joshi, keigo, katsuyou) — create 4-option multiple choice questions testing the correct usage.
+- Adjust based on available knowledge point types. If there aren't enough eligible kanji words for spelling, increase joshi, choice and fill proportions instead — NEVER force a spelling question on a non-kanji word.`
   }
 
   return `You are an English quiz generator. Based on the provided knowledge point list, generate a mixed-type quiz.
