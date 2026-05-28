@@ -28,6 +28,7 @@
   "sortMastery": "習得度順",
   "confirmed": "確認済み",
   "pendingConfirmation": "未確認",
+  "dueReview": "復習待ち",
   "keep": "✓ 保持",
   "discard": "🗑 削除",
   "keepTooltip": "この単語を保持",

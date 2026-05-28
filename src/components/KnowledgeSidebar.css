@@ -129,10 +129,7 @@
 [data-theme="dark"] .kp-type-tab.type-grammar  { background: #4a3018; }
 [data-theme="dark"] .kp-type-tab.type-collocation { background: #4a1a30; }
 
-/* Unconfirmed card: tab background matches card */
-.kp-item.kp-unconfirmed .kp-type-tab {
-  background: var(--bg-tertiary);
-}
+/* Unconfirmed card: tab label keeps its type background (no override) */
 
 /* Item main row — carries the card's border */
 .kp-item-main {
@@ -220,13 +217,19 @@
 }
 
 .kp-dot-unconfirmed {
-  background: var(--warning-color);
-  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.2);
+  background: #f5222d;
+  box-shadow: 0 0 0 2px rgba(245, 34, 45, 0.25);
 }
 
 .kp-dot-confirmed {
   background: var(--success-color);
   box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+}
+
+/* Due-for-review dot — amber */
+.kp-dot-due {
+  background: #faad14;
+  box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.3);
 }
 
 /* Action buttons */

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import './KnowledgeSidebar.css'
 import { TYPE_CONFIG, JA_TYPE_CONFIG, ALPHABETS, getJaSortKey } from '../config/languages'
+import { getLocalDateString } from '../utils/date'
 import LookUpPanel from './LookUpPanel'
 
 const KnowledgeSidebar = memo(function KnowledgeSidebar({
@@ -354,6 +355,11 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
             const isConfirmed = point.confirmed === true
             const isNew = newPointIds.has(point.id)
 
+            // Determine status: unconfirmed / due for review / up to date
+            const isDue = isConfirmed && point.nextReview && point.nextReview <= getLocalDateString()
+            const statusClass = !isConfirmed ? 'unconfirmed' : isDue ? 'due' : 'confirmed'
+            const statusLabel = !isConfirmed ? t('pendingConfirmation') : isDue ? t('dueReview') : t('confirmed')
+
             return (
               <div
                 key={point.id}
@@ -392,11 +398,11 @@ const KnowledgeSidebar = memo(function KnowledgeSidebar({
                     />
                   )}
 
-                  {/* Status dot (hide in batch mode) */}
+                  {/* Status dot (hide in batch mode) — 3 states: unconfirmed / due / up-to-date */}
                   {!batchMode && (
                     <span
-                      className={`kp-status-dot ${isConfirmed ? 'kp-dot-confirmed' : 'kp-dot-unconfirmed'}`}
-                      title={isConfirmed ? t('confirmed') : t('pendingConfirmation')}
+                      className={`kp-status-dot kp-dot-${statusClass}`}
+                      title={statusLabel}
                     />
                   )}
 
