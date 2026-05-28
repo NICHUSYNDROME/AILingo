@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { debug } from '../utils/debug'
 import { SCENARIOS, SENSITIVITY_LABELS } from '../config/languages'
@@ -221,6 +221,17 @@ const generateAnnotatedMessage = (originalText, annotations) => {
     missingWords: inserts.map(i => i.corrected)
   }
 }
+
+// ===== Memoized bubble content — prevents React re-renders from clearing text selection =====
+const AssistantBubbleContent = memo(function AssistantBubbleContent({ content }) {
+  return <div className="bubble-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+})
+
+const UserBubbleContent = memo(function UserBubbleContent({ content }) {
+  return <div className="bubble-text">{content}</div>
+})
+
+// ================================================================
 
 function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow, onProficiencyChange }) {
   const { t } = useTranslation()
@@ -1223,9 +1234,11 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
           return (
             <div key={msg.id || i} className="chat-msg-group">
               <div className={`chat-bubble ${msg.role}`} data-message-id={`msg-${msg.id || i}`}>
-                <div className="bubble-text">
-                  {msg.role === "assistant" ? <span dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : msg.content}
-                </div>
+                {msg.role === "assistant" ? (
+                  <AssistantBubbleContent content={msg.content} />
+                ) : (
+                  <UserBubbleContent content={msg.content} />
+                )}
                 {msg.role === 'assistant' && isTTSAvailable() && (
                   <button className={`message-tts-btn ${speakingMsgId === i ? 'speaking' : ''}`} onClick={async () => {
                     if (playingMsgIdRef.current === i && isSpeaking()) {

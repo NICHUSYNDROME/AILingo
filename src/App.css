@@ -1074,7 +1074,7 @@
 /* ===== Mobile selection lookup bubble ===== */
 .selection-lookup-btn {
   position: fixed;
-  z-index: 10000;
+  z-index: 1500;
   transform: translate(-50%, -100%);
   width: 36px;
   height: 36px;

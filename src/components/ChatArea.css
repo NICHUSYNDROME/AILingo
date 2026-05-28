@@ -202,6 +202,8 @@
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .chat-bubble.user .bubble-text {
@@ -889,6 +891,8 @@
 .correction-text {
   line-height: 1.6;
   color: var(--text-primary);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .correction-explanation {

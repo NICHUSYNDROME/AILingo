@@ -308,10 +308,12 @@ function AppView(props) {
   const handleLeftToggle = () => {
     setLeftOpen((v) => !v)
     setRightOpen(false)
+    dismissSelectionBubble()
   }
   const handleRightToggle = () => {
     setRightOpen((v) => !v)
     setLeftOpen(false)
+    dismissSelectionBubble()
   }
 
   // Wrap dict search to also open right sidebar in narrow mode
@@ -345,7 +347,7 @@ function AppView(props) {
         </Suspense>
       )}
       {/* ── Mobile selection lookup bubble ── */}
-      {isNarrow && selectionBubble && (
+      {isNarrow && selectionBubble && !leftOpen && !rightOpen && (
         <button
           className="selection-lookup-btn"
           style={{ left: selectionBubble.x, top: selectionBubble.y }}
