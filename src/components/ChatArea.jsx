@@ -234,7 +234,7 @@ const UserBubbleContent = memo(function UserBubbleContent({ content }) {
 
 // ================================================================
 
-function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow, onProficiencyChange }) {
+function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onReset, onDictSearchFromSelection, getConfirmedCount, targetKnowledge, language = 'en', isMuted = false, onAddKnowledgePoint, onUpdatePoint, existingKnowledgePoints = [], isNarrow, onProficiencyChange, onConversationEnd = null, initialMessages = null, initialCorrections = null, initialAnalysis = null, initialKnowledgePoints = null, initialTodos = null, initialRoundCount = 0, initialContinueFromId = null, initialSummaryDone = false }) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -281,7 +281,75 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     summary: false
   })
 
+  // ── 继续对话：从 initial* props 预填 state ──────────────────
+  const continueInitializedRef = useRef(false)
+  // 渲染阶段立即检查 initialMessages，确保 isChatStarted effect 能可靠检测到
+  if (initialMessages && initialMessages.length > 0 && !continueInitializedRef.current) {
+    continueInitializedRef.current = true
+  }
+  const initialMessagesRef = useRef(initialMessages)
+  const initialAnalysisRef = useRef(initialAnalysis)
+  const initialCorrectionsRef = useRef(initialCorrections)
+  const initialKnowledgePointsRef = useRef(initialKnowledgePoints)
+  const initialTodosRef = useRef(initialTodos)
+  const initialRoundCountRef = useRef(initialRoundCount)
+  const initialSummaryDoneRef = useRef(initialSummaryDone)
+  const initialContinueFromIdRef = useRef(initialContinueFromId)
+  useEffect(() => {
+    initialMessagesRef.current = initialMessages
+    initialAnalysisRef.current = initialAnalysis
+    initialCorrectionsRef.current = initialCorrections
+    initialKnowledgePointsRef.current = initialKnowledgePoints
+    initialTodosRef.current = initialTodos
+    initialRoundCountRef.current = initialRoundCount
+    initialSummaryDoneRef.current = initialSummaryDone
+    initialContinueFromIdRef.current = initialContinueFromId
+  })
+  useEffect(() => {
+    const im = initialMessagesRef.current
+    if (im) {
+      if (!continueInitializedRef.current) {
+        continueInitializedRef.current = true
+      }
+      setMessages(im)
+      setUserCorrections(initialCorrectionsRef.current || {})
+      setAnalysisResults(initialAnalysisRef.current || {})
+      setKnowledgePointsState(initialKnowledgePointsRef.current || [])
+      setRoundCount(initialRoundCountRef.current || 0)
+      if (initialSummaryDoneRef.current) {
+        setSummaryDone(true)
+      }
+      // 如果 AI 已经错误启动（时序问题），重置加载状态
+      if (initialTriggered.current) {
+        setLoading(false)
+        setAiStarted(false)
+      }
+      if (initialTodosRef.current) {
+        setTodos(initialTodosRef.current)
+      }
+    }
+  }, [initialMessages])
 
+  // ── 卸载保存所需的 refs（始终持有最新 state 快照）─────────────
+  const unmountStateRef = useRef({})
+  const latestStateRef = useRef({})
+  useEffect(() => {
+    const snap = {
+      messages,
+      userCorrections,
+      analysisResults,
+      knowledgePoints,
+      todos,
+      roundCount,
+      sessionConfirmedCount,
+      summaryDone,
+      conversationContext: conversationContextRef?.current,
+      language,
+      initialContinueFromId: initialContinueFromIdRef.current,
+    }
+    unmountStateRef.current = snap
+    latestStateRef.current = snap
+  })
 
   const generateMessageId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`
 
@@ -301,8 +369,72 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
   const [todos, setTodos] = useState([])
 
+  // ── 快照组装（从 ref 读取最新状态，避免闭包过期）───────────
+  const buildSessionSnapshot = useCallback((endedNormally) => {
+    const s = latestStateRef.current
+    const ctx = s.conversationContext || conversationContextRef?.current
+    if (!ctx) return null
+    const currentScenarios = SCENARIOS[s.language] || SCENARIOS.en
+    const scenarioLabel = currentScenarios.find((sc) => sc.value === ctx.scenario)?.label || ctx.scenario
+
+    return {
+      id: s.initialContinueFromId || `conv-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
+      language: s.language,
+      date: getLocalDateString(),
+      timestamp: new Date().toISOString(),
+      endedNormally,
+      isAssessment: !!ctx.isAssessment,
+      scenario: ctx.scenario,
+      scenarioLabel,
+      goal: ctx.goal || '',
+      sensitivity: ctx.sensitivity || 'normal',
+      maxRounds: ctx.maxRounds ?? 10,
+      targetKnowledge: ctx.targetKnowledge ?? 0,
+      roundCount: s.roundCount,
+      todos: (s.todos || []).map((t) => ({ id: t.id, text: t.text, completed: t.completed })),
+      messages: (s.messages || []).map((m) => ({ id: m.id, role: m.role, content: m.content, summaryData: m.summaryData || undefined })),
+      corrections: { ...(s.userCorrections || {}) },
+      analysis: { ...(s.analysisResults || {}) },
+      knowledgePoints: (s.knowledgePoints || []).map((kp) => ({ ...kp })),
+      sessionConfirmedCount: s.sessionConfirmedCount || 0,
+      continueFromId: s.initialContinueFromId || null,
+    }
+  }, [])
+
+  // ── 组件卸载时保存（对话被中断）────────────────────────────
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const s = unmountStateRef.current
+      if (!s.messages || s.messages.length === 0) return
+      if (s.summaryDone) return
+      // 用 buildSessionSnapshot（从 latestStateRef 读取）构建快照
+      const session = buildSessionSnapshot(false)
+      if (!session) return
+      // 同步写入 localStorage（beforeunload 中必须同步）
+      const key = s.language === 'ja' ? 'ja_conversation_history' : 'en_conversation_history'
+      try {
+        const raw = localStorage.getItem(key)
+        const list = raw ? JSON.parse(raw) : []
+        if (!Array.isArray(list)) return
+        list.unshift(session)
+        if (list.length > 50) list.length = 50
+        localStorage.setItem(key, JSON.stringify(list))
+      } catch { /* 静默失败 */ }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      // 如果已通过 handleBackToIdle 或 summaryDone 保存，跳过卸载保存
+      if (summarySavedRef.current) return
+      handleBeforeUnload()
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
+
   useEffect(() => {
     if (isChatStarted && ctx?.goal) {
+      // 继续对话时跳过 TODO 重置，保留从 initialTodos 加载的状态
+      if (continueInitializedRef.current) return
       const lines = ctx.goal.split('\n').filter((l) => l.trim())
       const items = lines.map((text, i) => ({
         id: i,
@@ -348,6 +480,50 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   useEffect(() => {
     if (isChatStarted && !initialTriggered.current) {
       initialTriggered.current = true
+
+      // 检查 continueInitializedRef 判断是否已由前序 effect 加载了初始消息
+      if (continueInitializedRef.current) {
+        // 从 ref 读取并设置消息/分析/纠错等
+        const initMsgs = initialMessagesRef.current
+        if (initMsgs && initMsgs.length > 0) {
+          setMessages(initMsgs)
+          const initAnalysis = initialAnalysisRef.current
+          if (initAnalysis) setAnalysisResults(initAnalysis)
+          const initCorrections = initialCorrectionsRef.current
+          if (initCorrections) setUserCorrections(initCorrections)
+          const initKps = initialKnowledgePointsRef.current
+          if (initKps) setKnowledgePointsState(initKps)
+          setRoundCount(initialRoundCountRef.current || 0)
+        }
+        setLoading(false)
+        setAiStarted(false)
+        return
+      }
+
+      // 再通过 ref 检查（回退方案）
+      const initMsgs = initialMessagesRef.current
+      if (initMsgs && initMsgs.length > 0) {
+        continueInitializedRef.current = true
+        setMessages(initMsgs)
+        // 预填 analysisResults / corrections / knowledgePoints
+        const initAnalysis = initialAnalysisRef.current
+        if (initAnalysis) {
+          setAnalysisResults(initAnalysis)
+        }
+        const initCorrections = initialCorrectionsRef.current
+        if (initCorrections) {
+          setUserCorrections(initCorrections)
+        }
+        const initKps = initialKnowledgePointsRef.current
+        if (initKps) {
+          setKnowledgePointsState(initKps)
+        }
+        setRoundCount(initialRoundCountRef.current || 0)
+        setLoading(false)
+        setAiStarted(false)
+        return
+      }
+
       setAiStarted(true)
       setLoading(true)
 
@@ -558,13 +734,30 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     }
 
     await triggerSummary(currentMessages)
-  }, [summaryDone, triggerSummary])
+  }, [summaryDone, triggerSummary, language])
+
+  // 正常结束后保存快照（监听 summaryDone 确保 summary 已写入 messages）
+  const summarySavedRef = useRef(false)
+  useEffect(() => {
+    if (summaryDone && messages.length > 0 && !summarySavedRef.current) {
+      summarySavedRef.current = true
+      // 延迟一帧确保 setMessages 已刷新
+      const timer = setTimeout(() => {
+        onConversationEnd?.(buildSessionSnapshot(true))
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [summaryDone, messages.length, onConversationEnd, buildSessionSnapshot])
 
   const handleBackToIdle = useCallback(() => {
     setShowBackConfirm(false)
     debug.log('[ChatArea] 用户点击返回，放弃当前对话，不生成总结')
+    if (messages.length > 0) {
+      summarySavedRef.current = true
+      onConversationEnd?.(buildSessionSnapshot(false))
+    }
     if (onReset) onReset()
-  }, [onReset])
+  }, [onReset, messages.length, onConversationEnd, buildSessionSnapshot])
 
   const detectConversationEnd = useCallback((aiMessage) => {
     if (aiMessage.conversationEnded) {

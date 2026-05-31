@@ -13,6 +13,7 @@ import { SCENARIOS } from './config/languages'
 import { getDictSystemPrompt } from './config/prompts'
 import { DEFAULT_PROFICIENCY_SCORE } from './config/proficiency'
 import { getLocalDateString } from './utils/date'
+import { saveConversation, updateConversation } from './utils/conversationHistory'
 import { useResponsive } from './hooks/useResponsive'
 import './App.css'
 
@@ -79,6 +80,7 @@ function App() {
     conversationKey,
     conversationContextRef,
     handleStartChat,
+    handleContinueChat,
     handleGenerateGoal,
     handleChatEnd,
     handleStartQuiz,
@@ -173,6 +175,27 @@ function App() {
     resetProficiencyScore()
   }, [resetProficiencyScore])
 
+  // ── Conversation history: continue or save ──────────────────
+  const [continueConversationData, setContinueConversationData] = useState(null)
+
+  const handleContinueConversation = useCallback(async (session) => {
+    // 先设置 continue 数据，确保 handleContinueChat 触发的 centerState 切换
+    // 渲染时 ChatArea 已能拿到 initialMessages，避免走"新对话"路径
+    setContinueConversationData(session)
+    // 使用 handleContinueChat 构建对话上下文（与 startChat 相同 prompt 逻辑）
+    await handleContinueChat(session)
+  }, [handleContinueChat])
+
+  const handleSaveConversation = useCallback((sessionData) => {
+    if (!sessionData) return
+    if (sessionData.continueFromId) {
+      // 继续的对话：更新原记录
+      updateConversation(language, sessionData)
+    } else {
+      saveConversation(language, sessionData)
+    }
+  }, [language])
+
   // Clear all knowledge points for current language
   const handleClearKnowledge = useCallback(() => {
     const STORAGE_KEY = language === 'ja' ? 'ja_knowledge_points' : 'en_knowledge_points'
@@ -252,6 +275,10 @@ function App() {
       handleDictKeyDown={handleDictKeyDown}
       selectionBubble={selectionBubble}
       dismissSelectionBubble={dismissSelectionBubble}
+      continueConversationData={continueConversationData}
+      setContinueConversationData={setContinueConversationData}
+      handleSaveConversation={handleSaveConversation}
+      handleContinueConversation={handleContinueConversation}
     />
   )
 }
