@@ -1,4 +1,4 @@
-import { Suspense, memo, lazy, useState, useCallback } from 'react'
+import { Suspense, memo, lazy, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import Layout from './components/Layout'
 import ScenarioSetup from './components/ScenarioSetup'
@@ -17,6 +17,7 @@ const ApiKeyModal = lazy(() => import('./components/ApiKeyModal'))
 
 const CenterPanel = memo(function CenterPanel(props) {
   const { t } = useTranslation()
+  const chatContinueRef = useRef(null)
   const {
     centerState,
     conversationKey,
@@ -55,7 +56,16 @@ const CenterPanel = memo(function CenterPanel(props) {
     handleSkipAssessment,
     handleAssessmentEnd,
     setProficiencyScore,
+    continueConversationData,
+    handleSaveConversation,
   } = props
+
+  // 新对话开始时清除 continue ref，避免旧数据污染
+  const prevCenterStateRef = useRef(centerState)
+  if (centerState === 'chatting' && prevCenterStateRef.current === 'idle' && !continueConversationData) {
+    chatContinueRef.current = null
+  }
+  prevCenterStateRef.current = centerState
 
   switch (centerState) {
     case 'idle':
@@ -99,6 +109,7 @@ const CenterPanel = memo(function CenterPanel(props) {
                 getConfirmedCount={getConfirmedCount}
                 dueForReviewCount={dueForReviewCount}
                 onStartQuiz={handleStartQuiz}
+                onContinueConversation={(session) => props.handleContinueConversation?.(session)}
               />
             )}
             {activeTab === 'knowledge' && (
@@ -121,6 +132,11 @@ const CenterPanel = memo(function CenterPanel(props) {
       )
 
     case 'chatting':
+      // 通过 ref 传递继续对话的初始数据（ref 跨越 Suspense 渲染间保持不变）
+      if (continueConversationData) {
+        chatContinueRef.current = continueConversationData
+      }
+      const continueData = chatContinueRef.current
       return (
         <Suspense fallback={<div className="center-loading">{t('loadingConversation')}</div>}>
           <ChatArea
@@ -139,6 +155,15 @@ const CenterPanel = memo(function CenterPanel(props) {
             onUpdatePoint={updatePoint}
             knowledgePoints={knowledgePoints}
             onProficiencyChange={props.setProficiencyScore}
+            onConversationEnd={props.handleSaveConversation}
+            initialMessages={continueData?.messages || null}
+            initialCorrections={continueData?.corrections || null}
+            initialAnalysis={continueData?.analysis || null}
+            initialKnowledgePoints={continueData?.knowledgePoints || null}
+            initialTodos={continueData?.todos || null}
+            initialRoundCount={continueData?.roundCount || 0}
+            initialContinueFromId={continueData?.id || null}
+            initialSummaryDone={continueData?.endedNormally === true || continueData?.summary != null}
           />
         </Suspense>
       )
@@ -162,6 +187,7 @@ const CenterPanel = memo(function CenterPanel(props) {
             onUpdatePoint={updatePoint}
             knowledgePoints={knowledgePoints}
             onProficiencyChange={setProficiencyScore}
+            onConversationEnd={props.handleSaveConversation}
           />
         </Suspense>
       )

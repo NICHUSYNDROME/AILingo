@@ -144,6 +144,61 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
   const handleStartQuiz = useCallback(() => setCenterState('quiz'), [])
   const handleQuizEnd = useCallback(() => setCenterState('idle'), [])
 
+  /**
+   * Continue a previously interrupted conversation.
+   * Builds the same prompt as handleStartChat but from a saved session,
+   * then sets centerState and all data in one batch so ChatArea mounts
+   * with initialMessages already available.
+   */
+  const handleContinueChat = useCallback(async (session) => {
+    const [universalCustom, sceneNotes, diversityLevel] = await Promise.all([
+      getUniversalPrompt(language),
+      getScenePrompt(language, session.scenario),
+      getDiversity(language, session.scenario),
+    ])
+
+    const sceneCtx = {
+      scenario: session.scenario,
+      scenarioLabel: session.scenarioLabel || session.scenario,
+      goal: session.goal || '',
+      sensitivity: session.sensitivity || 'normal',
+      maxRounds: session.maxRounds || 10,
+      targetKnowledge: session.targetKnowledge ?? 0,
+      language,
+      isAssessment: false,
+    }
+    const profGuidance = proficiencyScore !== null
+      ? getProficiencyGuidance(proficiencyScore, language)
+      : null
+    const universal = universalCustom || buildUniversalPrompt(language)
+    const sceneParams = buildSceneParams(sceneCtx, language)
+    const diversityText = getDiversityText(diversityLevel, language)
+
+    const goalLine = session.goal?.trim()
+      ? (language === 'ja'
+        ? `【会話目標】${session.goal.trim()}`
+        : `CONVERSATION GOAL: ${session.goal.trim()}`)
+      : ''
+
+    const fullPrompt = [profGuidance, goalLine, universal, diversityText, sceneParams, sceneNotes].filter(Boolean).join('\n\n')
+
+    conversationContextRef.current = {
+      scenario: session.scenario,
+      scenarioLabel: session.scenarioLabel || session.scenario,
+      goal: session.goal || '',
+      sensitivity: session.sensitivity || 'normal',
+      maxRounds: session.maxRounds || 10,
+      targetKnowledge: session.targetKnowledge ?? 0,
+      proficiencyScore,
+      language,
+      isAssessment: false,
+      customSystemPrompt: fullPrompt,
+    }
+    conversationIdRef.current += 1
+    setConversationKey(conversationIdRef.current)
+    setCenterState('chatting')
+  }, [proficiencyScore, language])
+
   const handleGenerateGoal = useCallback(async (scenarioLabel, scenarioValue) => {
     // Look up scene context (notes + description) for this scenario
     const [sceneNotes, sceneDesc] = scenarioValue
@@ -187,6 +242,7 @@ export function useScenarioState(language, currentScenarios, proficiencyScore = 
     conversationContextRef,
     // Handlers
     handleStartChat,
+    handleContinueChat,
     handleGenerateGoal,
     handleChatEnd,
     handleStartQuiz,

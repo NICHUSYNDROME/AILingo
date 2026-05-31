@@ -21,7 +21,7 @@ function getColor(score) {
   return 'var(--heatmap-level4)'
 }
 
-function HeatmapCalendar({ language = 'en' }) {
+function HeatmapCalendar({ language = 'en', onDateClick = null, selectedDate = null }) {
   const { t } = useTranslation()
   const now = new Date()
   const [currentYear, setCurrentYear] = useState(now.getFullYear())
@@ -140,12 +140,13 @@ function HeatmapCalendar({ language = 'en' }) {
           return (
             <div
               key={cell.key}
-              className={`heatmap-cell ${cell.isToday ? 'heatmap-today' : ''}`}
+              className={`heatmap-cell ${cell.isToday ? 'heatmap-today' : ''} ${cell.score > 0 ? 'heatmap-clickable' : ''} ${selectedDate === cell.key ? 'heatmap-selected' : ''}`}
               style={{
                 ...CELL_STYLE,
                 backgroundColor: getColor(cell.score),
               }}
               title={`${cell.key}: ${cell.score} ${t('heatmapActivities')}`}
+              onClick={cell.score > 0 && onDateClick ? () => onDateClick(cell.key) : undefined}
             />
           )
         })}
