@@ -1328,6 +1328,51 @@
 .conversation-history-rounds {
   font-size: 11px;
   color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Conversation history — inline task list */
+.conv-history-todo-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.conv-history-todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.conv-history-todo-item.completed {
+  color: var(--text-tertiary);
+}
+
+.conv-history-todo-item.completed .conv-history-todo-text {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.conv-history-todo-checkbox {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.conv-history-todo-item.completed .conv-history-todo-checkbox {
+  color: var(--success-color);
+}
+
+.conv-history-todo-text {
+  word-break: break-word;
 }
 
 .conversation-history-delete-btn {

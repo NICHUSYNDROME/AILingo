@@ -404,8 +404,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   }, [])
 
   // ── 组件卸载时保存（对话被中断）────────────────────────────
+  const savedOnUnloadRef = useRef(false)
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // 防止 beforeunload 事件 + React cleanup 双重调用产生重复记录
+      if (savedOnUnloadRef.current) return
+      savedOnUnloadRef.current = true
+
       const s = unmountStateRef.current
       debug.log(`[handleBeforeUnload] messages.length=${s.messages?.length || 0} summaryDone=${s.summaryDone} initialContinueFromId=${s.initialContinueFromId}`)
       if (!s.messages || s.messages.length === 0) return
@@ -753,9 +758,10 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   useEffect(() => {
     if (summaryDone && messages.length > 0 && !summarySavedRef.current) {
       summarySavedRef.current = true
-      // 延迟一帧确保 setMessages 已刷新
+      // 在 setTimeout 之前立刻捕获快照，避免 initialContinueFromId 因卸载被清空
+      const snapshot = buildSessionSnapshot(true)
       const timer = setTimeout(() => {
-        onConversationEnd?.(buildSessionSnapshot(true))
+        onConversationEnd?.(snapshot)
       }, 100)
       return () => clearTimeout(timer)
     }

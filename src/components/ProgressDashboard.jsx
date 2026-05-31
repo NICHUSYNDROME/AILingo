@@ -114,7 +114,6 @@ const ProgressDashboard = memo(function ProgressDashboard({
           <div className="conversation-history-list" key={refreshKey}>
             {conversations.map((conv) => {
               const totalTasks = conv.todos?.length || 0
-              const doneTasks = conv.todos?.filter((t) => t.completed).length || 0
               const timeStr = new Date(conv.timestamp).toLocaleString()
 
               return (
@@ -128,20 +127,24 @@ const ProgressDashboard = memo(function ProgressDashboard({
                       <span className="conversation-history-scenario">🏷 {conv.scenarioLabel || conv.scenario}</span>
                       <span className="conversation-history-time">{timeStr}</span>
                     </div>
-                    {conv.goal && (
-                      <div className="conversation-history-goal">
-                        🎯 {conv.goal.length > 60 ? conv.goal.slice(0, 60) + '...' : conv.goal}
-                      </div>
-                    )}
                     <div className="conversation-history-item-bottom">
-                      <span className={`conversation-history-status ${conv.endedNormally ? 'status-completed' : 'status-interrupted'}`}>
-                        {conv.endedNormally
-                          ? (totalTasks > 0
-                            ? t('tasksCompleted', { done: doneTasks, total: totalTasks })
-                            : t('conversationCompleted'))
-                          : t('conversationInterrupted')
-                        }
-                      </span>
+                      {totalTasks > 0 ? (
+                        <div className="conv-history-todo-items">
+                          {conv.todos.map((task, i) => (
+                            <div key={i} className={`conv-history-todo-item ${task.completed ? 'completed' : ''}`}>
+                              <span className="conv-history-todo-checkbox">{task.completed ? '☑' : '☐'}</span>
+                              <span className="conv-history-todo-text">{task.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className={`conversation-history-status ${conv.endedNormally ? 'status-completed' : 'status-interrupted'}`}>
+                          {conv.endedNormally
+                            ? t('conversationCompleted')
+                            : t('conversationInterrupted')
+                          }
+                        </span>
+                      )}
                       <span className="conversation-history-rounds">
                         🔄 {conv.roundCount}/{conv.maxRounds}
                       </span>
