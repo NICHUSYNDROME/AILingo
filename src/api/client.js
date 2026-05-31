@@ -53,23 +53,52 @@ export async function testTTSKey(key) {
 
 /**
  * Fetch with timeout support using AbortController.
+ * Auto-logs all AI API calls to window.__aiLogs for prompt debugging (dev only).
  * @param {string} url - The URL to fetch
  * @param {Object} options - Fetch options
  * @param {number} timeoutMs - Timeout in milliseconds (default 15000)
+ * @param {string} label - Agent label for __aiLogs (e.g. '2A_correctUserMessage')
  * @returns {Promise<Response>}
  */
-export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000, label = '') {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const startTime = Date.now()
   try {
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
     })
+
+    // Dev-only: auto-log AI API calls for prompt debugging
+    if (url === API_URL && typeof window !== 'undefined' && import.meta.env.DEV) {
+      const cloned = response.clone()
+      cloned.text().then(responseText => {
+        if (!window.__aiLogs) window.__aiLogs = []
+        window.__aiLogs.push({
+          name: label || 'unknown',
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - startTime,
+          success: response.ok,
+          status: response.status,
+          requestBody: options.body ? tryParseJSON(options.body) : null,
+          responseText: (responseText || '').substring(0, 10000),
+        })
+        if (window.__aiLogs.length > 200) {
+          window.__aiLogs.splice(0, window.__aiLogs.length - 200)
+        }
+      })
+    }
+
     return response
   } finally {
     clearTimeout(timeoutId)
   }
+}
+
+/** Dev-only: safe JSON parse helper. */
+function tryParseJSON(str) {
+  try { return JSON.parse(str) } catch { return str }
 }
 
 /**

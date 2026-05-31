@@ -2,7 +2,7 @@
  * Knowledge extraction API — extract structured knowledge points from triggers.
  */
 
-import { API_URL, getApiKey, parseJSONResponse } from './client'
+import { API_URL, getApiKey, parseJSONResponse, fetchWithTimeout } from './client'
 import { debug } from '../utils/debug'
 import { getKnowledgeProficiencyScoringGuide } from '../config/proficiency'
 
@@ -131,7 +131,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
 
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export async function extractSpecificKnowledge(trigger, context, language = 'en'
         stream: false,
         max_tokens: 1000,
       }),
-    })
+    }, 15000, 'extractSpecificKnowledge')
 
     if (!response.ok) {
       debug.warn('[extractSpecificKnowledge] API request failed:', response.status)

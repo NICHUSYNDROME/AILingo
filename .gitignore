@@ -43,3 +43,6 @@ public/__dev_settings.json
 
 # Duplicate path mistake
 Users/
+
+# AI feedback logs (agent evaluation data, never committed)
+ai-feedback/

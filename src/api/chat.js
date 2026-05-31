@@ -3,7 +3,7 @@
  */
 
 import { removeItem } from '../utils/storage'
-import { API_URL, getApiKey } from './client'
+import { API_URL, getApiKey, fetchWithTimeout } from './client'
 import { parseJSONResponse } from './client'
 import { buildSystemPrompt } from './prompts'
 import { debug } from '../utils/debug'
@@ -97,7 +97,7 @@ export async function sendToAI(
 
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export async function sendToAI(
         messages,
         stream: false,
       }),
-    })
+    }, 15000, 'sendToAI')
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -168,9 +168,11 @@ export async function generateConversationGoal(scenario, language = 'en', profic
     ? 'あなたは会話シーンアシスタントです。ユーザーは日本語を練習しています。選択されたシーンに基づいて、具体的な会話目標を生成してください。中文で返し、複数のサブ目標は改行で区切ってください。\n\n' +
       levelGuidance + '\n' +
       '例（レストラン注文）：\n' +
-      '用日语点一道主菜\n' +
-      '用日语询问今日特色菜\n' +
-      '用日语请求开发票\n\n' +
+      '点一道主菜\n' +
+      '询问今日特色菜\n' +
+      '请求开发票\n\n' +
+      '重要: 括号内的补充说明、第二人称指示（例：「如果不会可直接说…」「你可以…」）、动作描述（例：「并指菜单」「指着〜说」）、「用日语」「用英语」などの言語指定は絶対に含めないでください。ユーザーは既に日本語練習中なので、目標は純粋な言語行為そのものだけを簡潔に一文で記述してください。\n\n' +
+      '【絶対厳守】必ず中文（簡体字中国語）で出力してください。日本語で出力しないでください。会話目標はユーザーが中国語で読むためのものです。出力は必ず中文のみ。\n\n' +
       'そのままテキストだけを返してください。'
     : '用户正在练习英语对话，目标是提升英语口语能力。你是一个对话场景助手。根据用户选择的场景，生成具体的英语对话练习目标。\n\n' +
       levelGuidance + '\n' +
@@ -216,7 +218,7 @@ export async function generateConversationGoal(scenario, language = 'en', profic
   ]
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -229,7 +231,7 @@ export async function generateConversationGoal(scenario, language = 'en', profic
         stream: false,
         max_tokens: 250,
       }),
-    })
+    }, 15000, 'generateConversationGoal')
 
     if (!response.ok) {
       debug.warn('[generateConversationGoal] API request failed:', response.status)
@@ -393,7 +395,7 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
   )
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -406,7 +408,7 @@ export async function generateSummary(conversationHistory, ctx, language = 'en')
         stream: false,
         max_tokens: 2000,
       }),
-    })
+    }, 30000, 'generateSummary')
 
     if (!response.ok) {
       return 'Summary generation failed. Please try again later.'
@@ -487,7 +489,7 @@ export async function checkTaskCompletion(goal, todos, conversationHistory, lang
   ]
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithTimeout(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -499,7 +501,7 @@ export async function checkTaskCompletion(goal, todos, conversationHistory, lang
         temperature: 0,
         max_tokens: 200
       })
-    })
+    }, 15000, 'checkTaskCompletion')
 
     if (!response.ok) return []
 
