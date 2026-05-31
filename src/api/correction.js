@@ -51,10 +51,21 @@ export async function correctUserMessage(userMessage, sensitivity = 'normal', la
 
 ルール:
 - loose: 意味を変えるか理解困難にするエラーのみ修正
-- normal: 一般的なエラーを修正（時制、主語-動詞の一致、冠詞、前置詞、よくあるスペルミス）
+- normal: 一般的なエラーを修正（時制、主語-動詞の一致、助詞の脱落・誤用、よくあるスペルミス）
 - strict: すべてのエラーを修正、流暢さと自然さを改善
-- ユーザーの意図した意味は変えない
-- 修正が必要ない場合は null を返す`
+- **ユーザーの意図した意味は変えない（特に、疑問文を平叙文に変えない、疑問符「？」を句点「。」に変えない）**
+- **冗長な表現は修正する。特に「ください」と「お願いします」の重複は、どちらか一方のみに統合する**
+- **【最重要】日本語の助詞（を、が、は、に、で、の、へ 等）の脱落は、たとえ意味が通じても normal 以上で必ず修正する。助詞の脱落は「自然な省略」ではなく文法エラーである。**
+- **助詞だけではなく、連体修飾の「の」の脱落（例：「おすすめ料理」→「おすすめの料理」）も normal 以上で必ず修正する**
+- **名詞と名詞の間の「の」脱落も助詞脱落の一種として必ず修正対象とする**
+- **「ください」「お願いします」を含む依頼表現で目的語の後に助詞「を」がない場合（例：「オレンジジュースお願いします」「水ください」）は、normal 以上で必ず「オレンジジュースをお願いします」「水をください」に修正する**
+- 修正が必要ない場合は null を返す
+
+例:
+- 「おすすめ料理ありますか？」→ 助詞「の」と「は」が脱落 → normal 以上で「おすすめの料理はありますか？」に修正
+- 「ラーメンください」→ 助詞「を」が脱落 → normal 以上で「ラーメンをください」に修正
+- 「はい、オレンジジュースお願いします」→ 助詞「を」が脱落 → normal 以上で「はい、オレンジジュースをお願いします」に修正
+- 「おすすめの料理、何ですか？」→ 助詞「は」が脱落（読点は助詞ではない） → normal 以上で「おすすめの料理は何ですか？」に修正`
 
     : `You are a language correction expert. Correct the user's message according to the sensitivity setting.
 
@@ -84,7 +95,10 @@ Rules:
 - For loose: only fix errors that change meaning or make message hard to understand
 - For normal: fix common errors (tense, subject-verb agreement, articles, prepositions, common misspellings)
 - For strict: fix all errors, improve fluency and naturalness
-- Do NOT change the user's intended meaning
+- Do NOT change the user's intended meaning (especially: do NOT turn a question into a statement, do NOT replace "?" with ".")
+- **Fix redundant expressions. In Japanese, when both "ください" and "お願いします" appear redundantly, consolidate to just one form.**
+- **【CRITICAL】Missing particles in Japanese (を, が, は, に, で, の, へ) must be corrected at normal+ sensitivity, even if the meaning is still understandable. A missing particle is a grammar error, not a casual omission.**
+- **For request expressions with "ください" or "お願いします", if the object is missing the particle "を" (e.g., "オレンジジュースお願いします"), always add it at normal+ sensitivity → "オレンジジュースをお願いします"**
 - If no corrections needed (according to sensitivity), return null`
 
   const response = await fetchWithTimeout(API_URL, {
@@ -100,7 +114,7 @@ Rules:
       stream: false,
       max_tokens: 500
     })
-  })
+  }, 15000, '2A_correctUserMessage')
 
   if (!response.ok) return null
   const data = await response.json()
@@ -221,7 +235,7 @@ Please analyze spelling errors and grammar errors, and return plain text.`
       stream: false,
       max_tokens: 500
     })
-  })
+  }, 15000, '2B_analyzeGrammar')
 
   if (!response.ok) return null
   const data = await response.json()
@@ -237,8 +251,12 @@ Please analyze spelling errors and grammar errors, and return plain text.`
 /**
  * Generate vocabulary hints based on assistant's reply.
  */
-export async function generateHints(assistantReply, language = 'en') {
+export async function generateHints(assistantReply, language = 'en', isEnding = false, conversationGoal = '') {
   if (!assistantReply || assistantReply.trim() === '') return null
+  if (isEnding) {
+    debug.log('[2C] 对话已结束，跳过提示生成')
+    return null
+  }
 
   const apiKey = await getApiKey()
   if (!apiKey) return null
@@ -266,7 +284,11 @@ export async function generateHints(assistantReply, language = 'en') {
 - 質問がない場合は null を返す
 - 文中に埋め込まれた質問も検出すること（例：「can I...」「let me know if...」「want me to...」）
 - 「?」で終わるフレーズや、「can I」「shall I」「do you」「would you」「want me to」などの質問パターンを含むものは質問とみなす
-- 複数の質問がある場合は、最も直接的な質問を triggerQuestion として使用する`
+- 複数の質問がある場合は、最も直接的な質問を triggerQuestion として使用する
+- **【厳守】AIの返信に既に出現している単語は絶対に提案しないこと。返信内のすべての単語（送り仮名・活用形も含む）をチェックし、1文字でも一致する語彙があれば除外すること。提案すべき語彙がなくなった場合は null を返すこと。（例：AIが「オレンジジュースは、しぼりたてでとてもあまいです」と言った場合、「しぼりたて」「あまい」「オレンジジュース」はすべて既出現なので提案しない）**
+- **【厳守】提案する語彙は、ユーザーが会話の文脈だけから自力で見つけられないものに限定すること。AIの返信中に説明や注釈付きで登場した単語は提案しない（ユーザーが既に目にしているため）。提案する価値があるのは、AIの返信に登場しておらず、かつ会話の続きに役立つ語彙のみ。**
+- **AIの返信が会話の終了・まとめ（例：「〜ですね」「〜でいいですよ」「学習になりましたね」など）で、次のアクションを促す質問でない場合は null を返す**
+- **【重要】会話の目標（conversationGoal）を考慮し、ユーザーが目標を達成できるように誘導する語彙を優先的に提案すること。目標に関連する語彙を提案し、目標から逸脱する汎用的な語彙は避けること。**`
 
     : `You are a hint generator. Check if the assistant's reply contains a question.
 
@@ -290,7 +312,10 @@ Rules:
 - If no question, return null.
 - Detect questions even when they are embedded mid-sentence (e.g., "can I...", "let me know if...", "want me to...").
 - A phrase ending with '?' or containing question patterns like 'can I', 'shall I', 'do you', 'would you', 'want me to' counts as a question.
-- If multiple questions, use the most direct one as triggerQuestion.`
+- If multiple questions, use the most direct one as triggerQuestion.
+- **【STRICT】Never suggest words that already appear anywhere in the assistant's reply. Check every word (including inflected forms). If no safe words remain to suggest, return null. (e.g., if AI says "The orange juice is freshly squeezed and very sweet", do NOT suggest "orange juice", "freshly squeezed", or "sweet" — they all appear in the reply.)**
+- **【STRICT】Only suggest words that the user could NOT discover on their own from the conversation context. If a word is explained or glossed in the AI's reply, do NOT suggest it (the user has already seen it). Only suggest vocabulary that is genuinely new and useful for continuing the conversation.**
+- **If the assistant's reply is a conversation wrap-up / summary (e.g., "it was great talking", "you did well", "that's correct") without a forward-looking question, return null.**`
 
   debug.log('[2C] 检测 AI 回复中的提问:', assistantReply?.slice(0, 200))
   debug.log('[2C] 是否包含问号:', assistantReply?.includes('?'))
@@ -302,13 +327,13 @@ Rules:
       model: 'deepseek-chat',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Assistant's reply: "${assistantReply}"` }
+        { role: 'user', content: `Assistant's reply: "${assistantReply}"${conversationGoal ? `\nConversation goal: "${conversationGoal}"` : ''}` }
       ],
       temperature: 0.5,
       stream: false,
       max_tokens: 400
     })
-  })
+  }, 15000, '2C_generateHints')
 
   if (!response.ok) return null
   const data = await response.json()
@@ -325,7 +350,7 @@ Rules:
  * Extract structured corrections from assistant's reply,
  * returning cleaned dialogue and extracted corrections.
  */
-export async function extractCorrectionsFromReply(assistantReply, language = 'en') {
+export async function extractCorrectionsFromReply(assistantReply, language = 'en', isEnding = false) {
   if (!assistantReply || assistantReply.trim() === '') return null
 
   const apiKey = await getApiKey()
@@ -359,11 +384,24 @@ export async function extractCorrectionsFromReply(assistantReply, language = 'en
 7. ユーザーの間違いを直接指摘し、正しい形を提案する文
 8. 会話の流れを中断する教育的な補足説明
 9. 「（動作説明）」のような舞台指示・内心描写 — 括弧内が動作や状況を表す文は完全に除去
+10. **「〜でいいですよ」「〜で大丈夫ですよ」のようにユーザーの発言を「許容する」評価パターン — これらは教育的な承認であり、純粋な対話ではない**
+11. **「〜だけでも通じます」「〜でも意味は通じます」のように「許容範囲」を説明する文**
+12. **「たとえば、〜とか〜とか」「例えば〜」「〜などの〜」のように例示や提案を含む文（会話を続けるための自然な例示ではなく、語彙提案としての例示）**
+13. **「そうですね」「そうですよ」のような短い肯定のみで構成され、その後に教育的アドバイスが続く場合はアドバイス部分のみ除去**
+14. **「〜ですね」「〜でいいですね」のように、ユーザーの発言を修正/評価する形で引用した後に続く「ですね」 — これは教育的な承認・確認であり、純粋な対話ではない**
 
 重要: 学習アドバイスを含む文全体（または節）を除去してください。ただし、前後の対話内容が自然につながるように注意してください。
 
+=== isEnding モード（会話終了時）の追加ルール ===
+isEnding=true の場合、上記のルールに加えて以下を適用：
+16. **アシスタントの返信に含まれる「次のアクションを促す質問」（ユーザーに返答を求める疑問文）をすべて除去すること**
+17. **除去対象の質問パターン：「〜は何がいいですか？」「〜はどうですか？」「〜を食べますか？」「〜を飲みますか？」「〜はいかがですか？」「〜しませんか？」「〜したいですか？」「〜は好きですか？」など、会話を続けるように仕向ける質問**
+18. **質問を除去した後、残った文が意味をなさない場合は、その文も除去してcleanReplyを空文字列にしても構わない**
+
 === 修正項目を抽出するルール ===
-- アシスタントが自然にユーザーを修正した場合、その修正を抽出
+- **アシスタントがユーザーの発言の誤りを直接修正した場合のみ抽出すること**
+- **アシスタントが自発的に教えた語彙（例：「「しぼりたて」はfreshly squeezedという意味です」）は修正ではない — 抽出しないこと。これはユーザーの誤りではなく、新しい知識の提示である。**
+- **original と corrected が同じ単語の場合、それは修正ではないので extractedCorrections を null にすること**
 - アシスタントの表現からユーザーの元のエラーを推測する
 - 正確に。明示的または強く暗示された修正のみを抽出
 - 抽出するものがない場合は extractedCorrections を null にする
@@ -398,14 +436,22 @@ Identify and REMOVE entire sentences or clauses that match these patterns:
 8. Any sentence that directly corrects the user's mistake and suggests the correct form
 9. Any teaching interruption that breaks the natural flow of conversation
 10. Stage directions / inner thoughts in parentheses — e.g. "(places the water)" or "（动作描述）" — remove these entirely
+11. **"X is fine / X is correct / you can say X" — evaluative approval patterns that teach rather than converse**
+12. **"X is also understandable / X works too / people will understand X" — tolerance/acceptability explanations**
+13. **"for example, X or Y" / "like X or Y" / "such as X" — example-giving that serves as vocabulary suggestions rather than natural conversation flow**
+14. **Short affirmations ("That's right", "Exactly") that are followed by teaching advice — remove the advice part only**
+15. **"〜ですね" / "that's X, isn't it" / "so you said X" — patterns where the AI quotes/repeats the corrected form followed by an approving confirmation — this is teaching, not conversation**
 
 IMPORTANT: Remove the ENTIRE sentence or clause containing the teaching advice. Ensure the remaining dialogue still flows naturally.
 
 === RULES FOR EXTRACTING CORRECTIONS ===
-1. Grammar errors: Extract grammar issues that the AI explicitly points out or strongly implies through correct forms.
-2. Expression suggestions: Extract more natural/idiomatic expressions suggested by the AI.
-3. Spelling errors: Extract spelling issues that the AI naturally corrects.
-4. Learning tips: Extract hints like "we usually say X instead of Y", "small tip", etc., followed by corrections.
+1. **Only extract corrections where the AI is directly correcting a specific mistake the user made.**
+2. **Do NOT extract vocabulary items that the AI proactively teaches (e.g., "「しぼりたて」means freshly squeezed" — this is new knowledge, not a correction of user error).**
+3. **If original and corrected are the same word, it is NOT a correction — set extractedCorrections to null.**
+4. Grammar errors: Extract grammar issues that the AI explicitly points out or strongly implies through correct forms.
+5. Expression suggestions: Extract more natural/idiomatic expressions suggested by the AI.
+6. Spelling errors: Extract spelling issues that the AI naturally corrects.
+7. Learning tips: Extract hints like "we usually say X instead of Y", "small tip", etc., followed by corrections.
 
 CRITICAL: Each individual correction MUST be a SEPARATE object in the extractedCorrections array. Do NOT merge multiple corrections into one item.
 
@@ -420,13 +466,13 @@ If nothing to extract, set extractedCorrections to null.`
       model: 'deepseek-chat',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Assistant's reply: "${assistantReply}"` }
+        { role: 'user', content: `Assistant's reply: "${assistantReply}"${isEnding ? '\nThis is the closing message of the conversation. Remove any forward-looking questions from the cleaned reply.' : ''}` }
       ],
       temperature: 0,
       stream: false,
       max_tokens: 500
     })
-  })
+  }, 15000, '2D_extractCorrections')
 
   if (!response.ok) return null
   const data = await response.json()
@@ -465,13 +511,13 @@ export async function summarizeTipsAndExtractKnowledge(grammarAnalysis, extracte
   "knowledgePoints": [
     {
       "word": "最も短く自然な単語またはルール名",
-      "type": "word|phrase|grammar",
+      "type": "word|grammar",
       "context": "ユーザーの元の文"
     }
   ]
 
 knowledgePoints の各項目には以下の追加フィールドを含めることができます（type に応じて必須）:
-- type が "word" または "phrase" の場合: meaning（日本語の定義）、meaningChinese（中国語の意味）は任意
+- type が "word" の場合: meaning（日本語の定義）、meaningChinese（中国語の意味）は任意
 - type が "grammar" の場合: meaning（日本語での文法ルールの説明、1-2文）と meaningChinese（中国語での文法ルールの説明、1-2文）を必ず含めること
 - type が "grammar" の場合、partOfSpeech は空文字列に設定
 }
@@ -483,9 +529,10 @@ tips のルール:
 
 knowledgePoints のルール:
 - すべての修正から学習可能な知識ポイントを漏れなく出力すること。省略しないでください。
-- 並び順: 最初に word、次に phrase、最後に grammar。
+- 並び順: word タイプを先に、次に grammar タイプ。
 - word: 最も短く自然な形式で記述 — これは修正後の正しい形にしてください。
 - 文法ルールは最大4単語、可能なら1-2単語を優先
+- **【重要】"phrase"（フレーズ/慣用句）タイプの知識ポイントは自動抽出しないでください。フレーズはユーザーが辞書検索したときのみ生成すべきものであり、会話終了時の自動抽出対象ではありません。word と grammar のみを出力すること。**
 
 重要: すべてのスペル修正と文法修正に対応する知識ポイントを必ず出力してください。
 重要: word フィールドはできるだけ短く、ユーザーが覚えやすい形式にしてください。
@@ -593,7 +640,7 @@ Sensitivity setting: ${sensitivity}`
       stream: false,
       max_tokens: 800
     })
-  })
+  }, 15000, '2E_summarizeTips')
 
   if (!response.ok) return { tips: [], knowledgePoints: [] }
   const data = await response.json()

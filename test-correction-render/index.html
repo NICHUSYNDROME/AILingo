@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>纠正渲染测试</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #1a1a2e;
+    color: #d4d4d8;
+    padding: 40px;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+  h1 { font-size: 20px; margin-bottom: 8px; color: #e4e4e7; }
+  h2 { font-size: 16px; margin: 24px 0 12px; color: #a1a1aa; }
+  .subtitle { color: #a1a1aa; font-size: 13px; margin-bottom: 24px; }
+
+  .test-block {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .test-block .label {
+    font-size: 11px;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .test-block .original-line {
+    font-size: 13px;
+    color: #a1a1aa;
+    margin-bottom: 4px;
+  }
+  .test-block .result {
+    font-size: 18px;
+    padding: 8px 0;
+  }
+  .test-block .status {
+    font-size: 11px;
+    color: #71717a;
+    margin-top: 6px;
+  }
+
+  /* 策略 A：diff 算法（当前方案） */
+  .spelling-correction {
+    color: #ef4444;
+    text-decoration: line-through;
+  }
+  .spelling-suggestion {
+    color: #6aaa5a;
+    font-weight: 500;
+  }
+
+  /* 策略 B：只高亮新增字 */
+  .highlight-add {
+    color: #6aaa5a;
+    font-weight: 600;
+    position: relative;
+  }
+  .highlight-add::after {
+    content: '↑';
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #6aaa5a;
+  }
+
+  /* 策略 C：原词红色删除线 + 新增绿色 */
+  .corr-removed {
+    color: #ef4444;
+    text-decoration: line-through;
+  }
+  .corr-added {
+    color: #6aaa5a;
+    font-weight: 600;
+  }
+
+  /* 策略 D：类似 git diff — 只显示 corrective diff */
+  .diff-added {
+    display: inline-block;
+    background: #166534;
+    color: #86efac;
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 600;
+  }
+  .diff-removed {
+    display: inline-block;
+    background: #7f1d1d;
+    color: #fca5a5;
+    border-radius: 3px;
+    padding: 0 2px;
+    text-decoration: line-through;
+  }
+
+  .separator { border: none; border-top: 1px solid #3f3f46; margin: 32px 0; }
+
+  textarea {
+    width: 100%;
+    padding: 10px;
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #d4d4d8;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+  }
+  button {
+    padding: 8px 20px;
+    background: #6aaa5a;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  button:hover { background: #5a9a4a; }
+  input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #d4d4d8;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🧪 纠正渲染测试</h1>
+<p class="subtitle">对比不同渲染策略的效果，选择最优方案</p>
+<hr class="separator">
+
+<!-- ============ 固定测试用例 ============ -->
+<h2>📌 测试用例 1：おすすめラーメンは何です？ → おすすめのラーメンは何ですか？</h2>
+
+<div class="test-block">
+  <div class="label">原始文本</div>
+  <div class="original-line">おすすめラーメンは何です？</div>
+</div>
+
+<div id="strategyA" class="test-block">
+  <div class="label">策略 A — 当前 diff 算法</div>
+  <div class="status">直接运行现有的 findDifferences + generateAnnotatedMessage</div>
+</div>
+
+<div id="strategyB" class="test-block">
+  <div class="label">策略 B — 只高亮新增字符（用户期望）</div>
+  <div class="status">在 corrected 文本中找到相对于 original 新增的字符，只高亮新增部分</div>
+</div>
+
+<div id="strategyC" class="test-block">
+  <div class="label">策略 C — 删除线 + 新增绿色</div>
+  <div class="status">被替换的原词标删除线，新增字符标绿色</div>
+</div>
+
+<div id="strategyD" class="test-block">
+  <div class="label">策略 D — 基于 changes 数组逐条标注</div>
+  <div class="status">直接解析 2A 的 changes 数组，逐条渲染修正</div>
+</div>
+
+<hr class="separator">
+
+<!-- ============ 测试用例 2 ============ -->
+<h2>📌 测试用例 2：はい、ラーメン好きだよ。おすすめラーメンをください！ → はい、ラーメンが好きだよ。おすすめのラーメンをください！</h2>
+
+<div class="test-block">
+  <div class="label">原始文本</div>
+  <div class="original-line">はい、ラーメン好きだよ。おすすめラーメンをください！</div>
+</div>
+
+<div id="strategyA2" class="test-block">
+  <div class="label">策略 A — 当前 diff 算法</div>
+</div>
+
+<div id="strategyB2" class="test-block">
+  <div class="label">策略 B — 只高亮新增字符</div>
+</div>
+
+<div id="strategyD2" class="test-block">
+  <div class="label">策略 D — 基于 changes 数组逐条标注</div>
+</div>
+
+<hr class="separator">
+
+<hr class="separator">
+
+<!-- ============ 测试用例 3（增删改混合） ============ -->
+<h2>📌 测试用例 3（增+删+改）：私ハラーメン大好きた → 私はラーメンが大好きです</h2>
+
+<div class="test-block">
+  <div class="label">原始文本</div>
+  <div class="original-line">私ハラーメン大好きた</div>
+</div>
+
+<div id="strategyA3" class="test-block">
+  <div class="label">策略 A — 当前 diff 算法</div>
+</div>
+
+<div id="strategyB3" class="test-block">
+  <div class="label">策略 B — 只高亮新增字符</div>
+</div>
+
+<div id="strategyC3" class="test-block">
+  <div class="label">策略 C — 删除线 + 新增绿色</div>
+</div>
+
+<div id="strategyD3" class="test-block">
+  <div class="label">策略 D — 基于 changes 逐条标注</div>
+</div>
+
+<!-- ============ 自定义测试 ============ -->
+<h2>🔧 自定义测试</h2>
+<div>
+  <label style="font-size:13px; color:#a1a1aa; display:block; margin-bottom:4px;">原始文本</label>
+  <input type="text" id="customOriginal" value="おすすめラーメンは何です？">
+  <label style="font-size:13px; color:#a1a1aa; display:block; margin-bottom:4px;">修正文本</label>
+  <input type="text" id="customCorrected" value="おすすめのラーメンは何ですか？">
+  <label style="font-size:13px; color:#a1a1aa; display:block; margin-bottom:4px;">Changes JSON（从 2A 返回的 changes 数组）</label>
+  <textarea id="customChanges" rows="6">[
+  {"original": "おすすめラーメン", "corrected": "おすすめのラーメン", "type": "grammar", "explanation": "連体修飾の助詞「の」が必要"},
+  {"original": "何です？", "corrected": "何ですか？", "type": "grammar", "explanation": "疑問文では「ですか」が標準的"}
+]</textarea>
+  <button onclick="runCustomTest()">运行测试</button>
+</div>
+
+<div id="customResult" style="margin-top:16px;"></div>
+
+<script>
+// ==============================
+// Tokenizer (与 ChatArea 中一致)
+// ==============================
+function tokenize(str, lang) {
+  if (lang === 'ja') {
+    const matches = str.match(/[\p{Script=Hani}]+|[\p{Script=Hiragana}]+|[\p{Script=Katakana}]+|[、。！？]|\s+/ug)
+    return matches || []
+  }
+  return str.match(/\S+/g) || []
+}
+
+function escapeHtml(str) {
+  if (!str) return ''
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+// ==============================
+// 简易 Diff（与 ChatArea 一致）
+// ==============================
+function computeWordDiff(originalWords, correctedWords) {
+  const ops = []
+  let i = 0, j = 0
+  while (i < originalWords.length || j < correctedWords.length) {
+    if (i < originalWords.length && j < correctedWords.length && originalWords[i] === correctedWords[j]) {
+      ops.push({ type: 'EQUAL', value: originalWords[i] })
+      i++; j++
+    } else {
+      let foundMatch = false
+      for (let lookAhead = 1; lookAhead <= 3 && j + lookAhead < correctedWords.length; lookAhead++) {
+        if (originalWords[i] === correctedWords[j + lookAhead]) {
+          for (let k = 0; k < lookAhead; k++) ops.push({ type: 'INSERT', value: correctedWords[j + k] })
+          j += lookAhead
+          foundMatch = true
+          break
+        }
+      }
+      if (!foundMatch) {
+        for (let lookAhead = 1; lookAhead <= 3 && i + lookAhead < originalWords.length; lookAhead++) {
+          if (correctedWords[j] === originalWords[i + lookAhead]) {
+            for (let k = 0; k < lookAhead; k++) ops.push({ type: 'DELETE', value: originalWords[i + k] })
+            i += lookAhead
+            foundMatch = true
+            break
+          }
+        }
+      }
+      if (!foundMatch) {
+        ops.push({ type: 'DELETE', value: originalWords[i] })
+        ops.push({ type: 'INSERT', value: correctedWords[j] })
+        i++; j++
+      }
+    }
+  }
+  // Merge adjacent DELETE+INSERT into REPLACE
+  const merged = []
+  for (let idx = 0; idx < ops.length; idx++) {
+    const op = ops[idx]
+    const next = ops[idx + 1]
+    if (op.type === 'DELETE' && next && next.type === 'INSERT') {
+      merged.push({ type: 'REPLACE', original: op.value, corrected: next.value })
+      idx++
+    } else {
+      merged.push(op)
+    }
+  }
+  return merged
+}
+
+function convertOpsToAnnotations(ops, originalText, originalWords, hasSpaces) {
+  const annotations = []
+  let currentPos = 0
+  const sep = hasSpaces ? 1 : 0
+  for (const op of ops) {
+    if (op.type === 'EQUAL') {
+      currentPos += op.value.length + sep
+    } else if (op.type === 'DELETE') {
+      annotations.push({ type: 'DELETE', original: op.value, startIndex: currentPos, endIndex: currentPos + op.value.length })
+      currentPos += op.value.length + sep
+    } else if (op.type === 'INSERT') {
+      annotations.push({ type: 'INSERT', corrected: op.value, position: currentPos })
+    } else if (op.type === 'REPLACE') {
+      annotations.push({ type: 'REPLACE', original: op.original, corrected: op.corrected, startIndex: currentPos, endIndex: currentPos + op.original.length })
+      currentPos += op.original.length + sep
+    }
+  }
+  return annotations
+}
+
+function generateAnnotatedMessage(originalText, annotations) {
+  if (!annotations || annotations.length === 0) return { annotatedHtml: escapeHtml(originalText), missingWords: [] }
+  const inserts = annotations.filter(a => a.type === 'INSERT')
+  const replacesAndDeletes = annotations.filter(a => a.type === 'REPLACE' || a.type === 'DELETE')
+  let result = originalText
+  const sorted = [...replacesAndDeletes].sort((a, b) => b.startIndex - a.startIndex)
+  for (const ann of sorted) {
+    const before = result.slice(0, ann.startIndex)
+    const after = result.slice(ann.endIndex)
+    let annotated
+    if (ann.type === 'REPLACE') {
+      annotated = '<span class="spelling-correction">' + escapeHtml(ann.original) + '</span> <span class="spelling-suggestion">' + escapeHtml(ann.corrected) + '</span>'
+    } else {
+      annotated = '<span class="spelling-correction">' + escapeHtml(ann.original) + '</span>'
+    }
+    result = before + annotated + after
+  }
+  return { annotatedHtml: result, missingWords: inserts.map(i => i.corrected) }
+}
+
+// ==============================
+// 策略 A：当前 diff 算法
+// ==============================
+function renderStrategyA(original, corrected) {
+  const originalWords = tokenize(original, 'ja')
+  const correctedWords = tokenize(corrected, 'ja')
+  const ops = computeWordDiff(originalWords, correctedWords)
+  const annotations = convertOpsToAnnotations(ops, original, originalWords, false)
+  const { annotatedHtml, missingWords } = generateAnnotatedMessage(original, annotations)
+  const container = document.createElement('div')
+  container.className = 'result'
+  container.innerHTML = annotatedHtml
+  const status = document.createElement('div')
+  status.className = 'status'
+  status.textContent = `missingWords (未渲染的新增): ${missingWords.length ? missingWords.join(', ') : '无'}`
+  container.appendChild(status)
+  return container
+}
+
+// ==============================
+// 策略 B：只高亮新增字符
+// 在 corrected 文本中找出原文本没有的字符，只高亮新增部分
+// ==============================
+function renderStrategyB(original, corrected) {
+  // 找出 corrected 中相对于 original 新增的字符
+  // 使用逐个字符对比
+  let result = ''
+  let oi = 0, ci = 0
+  while (ci < corrected.length) {
+    if (oi < original.length && corrected[ci] === original[oi]) {
+      result += escapeHtml(corrected[ci])
+      oi++; ci++
+    } else if (oi < original.length) {
+      // 尝试在 corrected 中查找 original[oi]
+      let found = false
+      for (let look = ci; look < corrected.length; look++) {
+        if (corrected[look] === original[oi]) {
+          // corrected[ci..look-1] 是新增的
+          const added = corrected.slice(ci, look)
+          result += '<span class="highlight-add">' + escapeHtml(added) + '</span>'
+          ci = look
+          found = true
+          break
+        }
+      }
+      if (!found) {
+        // original[oi] 被删除了——跳过
+        oi++
+      }
+    } else {
+      // 原文本已结束，剩余的都是新增
+      const remaining = corrected.slice(ci)
+      result += '<span class="highlight-add">' + escapeHtml(remaining) + '</span>'
+      break
+    }
+  }
+  const container = document.createElement('div')
+  container.className = 'result'
+  container.innerHTML = result
+  const status = document.createElement('div')
+  status.className = 'status'
+  status.textContent = `原始: ${original}  →  修正: ${corrected}`
+  container.appendChild(status)
+  return container
+}
+
+// ==============================
+// 策略 C：删除线 + 新增绿色
+// ==============================
+function renderStrategyC(original, corrected) {
+  // 找出 original 相对于 corrected 删除的字符和新增的字符
+  let result = ''
+  let oi = 0, ci = 0
+  while (oi < original.length || ci < corrected.length) {
+    if (oi < original.length && ci < corrected.length && original[oi] === corrected[ci]) {
+      result += escapeHtml(corrected[ci])
+      oi++; ci++
+    } else if (oi < original.length) {
+      // 尝试在 corrected 中查找 original[oi]
+      let found = false
+      for (let look = ci; look < corrected.length; look++) {
+        if (corrected[look] === original[oi]) {
+          // corrected[ci..look-1] 是新增的
+          const added = corrected.slice(ci, look)
+          result += '<span class="corr-added">' + escapeHtml(added) + '</span>'
+          ci = look
+          found = true
+          break
+        }
+      }
+      if (!found) {
+        // original[oi] 被删除了
+        result += '<span class="corr-removed">' + escapeHtml(original[oi]) + '</span>'
+        oi++
+      }
+    } else {
+      // 原文本结束，剩余的都是新增
+      const remaining = corrected.slice(ci)
+      result += '<span class="corr-added">' + escapeHtml(remaining) + '</span>'
+      break
+    }
+  }
+  const container = document.createElement('div')
+  container.className = 'result'
+  container.innerHTML = result
+  return container
+}
+
+// ==============================
+// 策略 D：基于 changes 数组
+// 解析 2A 返回的 changes 数组，在 corrected 文本中标注新增部分
+// ==============================
+function renderStrategyD(original, corrected, changes) {
+  let result = ''
+  let pos = 0
+  // 将 changes 按照 corrected 文本中的位置排序
+  // 在每个 change 中，找出 corrected 比 original 多出的部分
+  // 在完整的 corrected 文本中标注这些多出的部分
+  
+  // 更简单的方法：直接在 corrected 文本中标注与 original 不同的字符
+  // 使用字符串 diff 找出 corrected 中新增的字符序列
+  
+  result = ''
+  let oi = 0, ci = 0
+  
+  while (ci < corrected.length) {
+    if (oi < original.length && corrected[ci] === original[oi]) {
+      result += escapeHtml(corrected[ci])
+      oi++; ci++
+    } else if (oi < original.length) {
+      // corrected[ci] 与 original[oi] 不同
+      // 先尝试找修正后的对应关系
+      let foundInOrig = false
+      for (let look = ci + 1; look <= corrected.length; look++) {
+        if (corrected.slice(ci, look).includes(original[oi])) {
+          // corrected[ci..look-1] 中有新增字符
+          const prefix = corrected.slice(ci, corrected.indexOf(original[oi], ci))
+          if (prefix) {
+            result += '<span class="corr-added">' + escapeHtml(prefix) + '</span>'
+          }
+          ci += prefix.length
+          foundInOrig = true
+          break
+        }
+      }
+      if (!foundInOrig) {
+        // original[oi] 在原文本中被删除或替换
+        // 检查 corrected 中是否包含替换后的字符
+        result += '<span class="corr-removed">' + escapeHtml(original[oi]) + '</span>'
+        oi++
+      }
+    } else {
+      // 剩余的全是新增
+      result += '<span class="corr-added">' + escapeHtml(corrected.slice(ci)) + '</span>'
+      break
+    }
+  }
+
+  const container = document.createElement('div')
+  container.className = 'result'
+  container.innerHTML = result
+  return container
+}
+
+// ==============================
+// 基于 changes 数组的精确渲染（推荐方案）
+// 解析 2A 的 changes，在 corrected 文本中只高亮新增字符
+// ==============================
+function renderFromChanges(original, corrected, changes) {
+  // 确定 corrected 中哪些字符是"新增"的
+  // 策略：逐个字符对比 original 和 corrected
+  // "新增" = 出现在 corrected 中但没有在对应位置出现在 original 中的字符
+  
+  const addedPositions = new Set()
+  let oi = 0
+  for (let ci = 0; ci < corrected.length; ci++) {
+    if (oi < original.length && corrected[ci] === original[oi]) {
+      oi++
+    } else {
+      addedPositions.add(ci)
+    }
+  }
+  
+  // 构建渲染结果
+  let result = ''
+  for (let i = 0; i < corrected.length; i++) {
+    if (addedPositions.has(i)) {
+      result += '<span class="diff-added">' + escapeHtml(corrected[i]) + '</span>'
+    } else {
+      result += escapeHtml(corrected[i])
+    }
+  }
+  
+  const container = document.createElement('div')
+  container.className = 'result'
+  container.innerHTML = result
+  return container
+}
+
+// ==============================
+// 运行固定测试
+// ==============================
+function findDifferences(original, corrected, language) {
+  if (!original || !corrected || original === corrected) return []
+  const tokenize_ = (str, lang) => {
+    if (lang === 'ja') {
+      const matches = str.match(/[\p{Script=Hani}]+|[\p{Script=Hiragana}]+|[\p{Script=Katakana}]+|[、。！？]|\s+/ug)
+      return matches || []
+    }
+    return str.match(/\S+/g) || []
+  }
+  const originalWords = tokenize_(original, language)
+  const correctedWords = tokenize_(corrected, language)
+  const ops = computeWordDiff(originalWords, correctedWords)
+  const hasSpaces = language !== 'ja'
+  return convertOpsToAnnotations(ops, original, originalWords, hasSpaces)
+}
+
+// 测试用例 1
+const orig1 = 'おすすめラーメンは何です？'
+const corr1 = 'おすすめのラーメンは何ですか？'
+const changes1 = [
+  { original: 'おすすめラーメン', corrected: 'おすすめのラーメン', type: 'grammar', explanation: '連体修飾の助詞「の」が必要' },
+  { original: '何です？', corrected: '何ですか？', type: 'grammar', explanation: '疑問文では「ですか」が標準的' }
+]
+
+document.getElementById('strategyA').appendChild(renderStrategyA(orig1, corr1))
+document.getElementById('strategyB').appendChild(renderStrategyB(orig1, corr1))
+document.getElementById('strategyC').appendChild(renderStrategyC(orig1, corr1))
+document.getElementById('strategyD').appendChild(renderFromChanges(orig1, corr1, changes1))
+
+// 测试用例 2
+const orig2 = 'はい、ラーメン好きだよ。おすすめラーメンをください！'
+const corr2 = 'はい、ラーメンが好きだよ。おすすめのラーメンをください！'
+const changes2 = [
+  { original: 'ラーメン好き', corrected: 'ラーメンが好き', type: 'grammar', explanation: '助詞「が」が脱落' },
+  { original: 'おすすめラーメン', corrected: 'おすすめのラーメン', type: 'grammar', explanation: '連体修飾の「の」が脱落' }
+]
+
+document.getElementById('strategyA2').appendChild(renderStrategyA(orig2, corr2))
+document.getElementById('strategyB2').appendChild(renderStrategyB(orig2, corr2))
+document.getElementById('strategyD2').appendChild(renderFromChanges(orig2, corr2, changes2))
+
+// 测试用例 3（增删改）
+const orig3 = '私ハラーメン大好きた'
+const corr3 = '私はラーメンが大好きです'
+const changes3 = [
+  { original: 'ハ', corrected: 'は', type: 'spelling', explanation: '助詞は平仮名で書く' },
+  { original: 'ラーメン大好きた', corrected: 'ラーメンが大好きです', type: 'grammar', explanation: '助詞「が」が脱落、語尾は「です」が適切' }
+]
+
+document.getElementById('strategyA3').appendChild(renderStrategyA(orig3, corr3))
+document.getElementById('strategyB3').appendChild(renderStrategyB(orig3, corr3))
+document.getElementById('strategyC3').appendChild(renderStrategyC(orig3, corr3))
+document.getElementById('strategyD3').appendChild(renderFromChanges(orig3, corr3, changes3))
+
+// ==============================
+// 自定义测试
+// ==============================
+function runCustomTest() {
+  const original = document.getElementById('customOriginal').value
+  const corrected = document.getElementById('customCorrected').value
+  let changes = []
+  try {
+    changes = JSON.parse(document.getElementById('customChanges').value)
+  } catch(e) {
+    changes = []
+  }
+
+  const container = document.getElementById('customResult')
+  container.innerHTML = ''
+  
+  const createBlock = (title, html) => {
+    const div = document.createElement('div')
+    div.className = 'test-block'
+    const label = document.createElement('div')
+    label.className = 'label'
+    label.textContent = title
+    div.appendChild(label)
+    const result = document.createElement('div')
+    result.className = 'result'
+    result.innerHTML = html
+    div.appendChild(result)
+    return div
+  }
+
+  // 策略 A
+  const aResult = renderStrategyA(original, corrected)
+  const blockA = document.createElement('div')
+  blockA.className = 'test-block'
+  const labelA = document.createElement('div')
+  labelA.className = 'label'
+  labelA.textContent = '策略 A — 当前 diff 算法'
+  blockA.appendChild(labelA)
+  blockA.appendChild(aResult)
+  container.appendChild(blockA)
+
+  // 策略 B
+  const blockB = document.createElement('div')
+  blockB.className = 'test-block'
+  const labelB = document.createElement('div')
+  labelB.className = 'label'
+  labelB.textContent = '策略 B — 只高亮新增字符'
+  blockB.appendChild(labelB)
+  blockB.appendChild(renderStrategyB(original, corrected))
+  container.appendChild(blockB)
+
+  // 基于 changes
+  const blockD = document.createElement('div')
+  blockD.className = 'test-block'
+  const labelD = document.createElement('div')
+  labelD.className = 'label'
+  labelD.textContent = '基于 changes — 精确标注新增字符'
+  blockD.appendChild(labelD)
+  blockD.appendChild(renderFromChanges(original, corrected, changes.length ? changes : changes1))
+  container.appendChild(blockD)
+}
+</script>
+</body>
+</html>

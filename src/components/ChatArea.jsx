@@ -42,185 +42,42 @@ const renderMarkdown = (text) => {
   return html
 }
 
-// ===== Simplified and Reliable Word Diff =====
-// This is a practical diff for word sequences that handles insert, delete, replace
-// Improved: uses look-ahead to better align words and merges adjacent DELETE+INSERT into REPLACE
-const computeWordDiff = (originalWords, correctedWords) => {
-  const ops = []
-  let i = 0, j = 0
-
-  
-  while (i < originalWords.length || j < correctedWords.length) {
-    if (i < originalWords.length && j < correctedWords.length && originalWords[i] === correctedWords[j]) {
-      // Words match
-      ops.push({ type: 'EQUAL', value: originalWords[i] })
-      i++
-      j++
-    } else {
-      // Not equal - try to find a match ahead
-      let foundMatch = false
-      
-      // Look ahead in corrected words to see if current original word appears later
-      for (let lookAhead = 1; lookAhead <= 3 && j + lookAhead < correctedWords.length; lookAhead++) {
-        if (originalWords[i] === correctedWords[j + lookAhead]) {
-          // Insert the missing words before this match
-          for (let k = 0; k < lookAhead; k++) {
-            ops.push({ type: 'INSERT', value: correctedWords[j + k] })
-          }
-          j += lookAhead
-          foundMatch = true
+// ===== Helper: generate annotated HTML with character-level diff =====
+// Strategy C: shows removed chars with strikethrough (red), added chars in green
+const generateCorrectionHtml = (original, corrected) => {
+  if (!original || !corrected || original === corrected) return escapeHtml(original || corrected || '')
+  let result = ''
+  let oi = 0, ci = 0
+  while (oi < original.length || ci < corrected.length) {
+    if (oi < original.length && ci < corrected.length && original[oi] === corrected[ci]) {
+      result += escapeHtml(corrected[ci])
+      oi++; ci++
+    } else if (oi < original.length) {
+      // Try to find original[oi] later in corrected text
+      let found = false
+      for (let look = ci; look < corrected.length; look++) {
+        if (corrected[look] === original[oi]) {
+          // Everything from corrected[ci..look-1] is newly added
+          const added = corrected.slice(ci, look)
+          if (added) result += '<span class="corr-added">' + escapeHtml(added) + '</span>'
+          ci = look
+          found = true
           break
         }
       }
-      
-      if (!foundMatch) {
-        // Look ahead in original words to see if current corrected word appears later
-        for (let lookAhead = 1; lookAhead <= 3 && i + lookAhead < originalWords.length; lookAhead++) {
-          if (correctedWords[j] === originalWords[i + lookAhead]) {
-            // Delete the words before this match
-            for (let k = 0; k < lookAhead; k++) {
-              ops.push({ type: 'DELETE', value: originalWords[i + k] })
-            }
-            i += lookAhead
-            foundMatch = true
-            break
-          }
-        }
+      if (!found) {
+        // original[oi] was removed
+        result += '<span class="corr-removed">' + escapeHtml(original[oi]) + '</span>'
+        oi++
       }
-      
-      if (!foundMatch) {
-        // No match found - treat as DELETE + INSERT (will be merged into REPLACE later)
-        ops.push({ type: 'DELETE', value: originalWords[i] })
-        ops.push({ type: 'INSERT', value: correctedWords[j] })
-        i++
-        j++
-      }
-    }
-  }
-  
-  // Post-process: merge adjacent DELETE+INSERT into REPLACE
-  const mergedOps = []
-  for (let idx = 0; idx < ops.length; idx++) {
-    const op = ops[idx]
-    const nextOp = ops[idx + 1]
-    
-    if (op.type === 'DELETE' && nextOp && nextOp.type === 'INSERT') {
-      mergedOps.push({ type: 'REPLACE', original: op.value, corrected: nextOp.value })
-      idx++ // skip the next INSERT
     } else {
-      mergedOps.push(op)
+      // Original text exhausted; rest of corrected is newly added
+      const remaining = corrected.slice(ci)
+      result += '<span class="corr-added">' + escapeHtml(remaining) + '</span>'
+      break
     }
   }
-
-  return mergedOps
-}
-
-// ===== Helper: convert edit script to annotation objects =====
-// Now expects pre-merged ops (DELETE+INSERT already combined into REPLACE by computeWordDiff)
-// For Japanese (no spaces between tokens), the separator offset is 0 instead of 1
-const convertOpsToAnnotations = (ops, originalText, originalWords, hasSpaces = true) => {
-  const annotations = []
-  if (!ops || !Array.isArray(ops)) return annotations
-  let currentPos = 0
-  const separatorLen = hasSpaces ? 1 : 0
-  
-  for (const op of ops) {
-    if (op.type === 'EQUAL') {
-      currentPos += op.value.length + separatorLen
-    } else if (op.type === 'DELETE') {
-      const start = currentPos
-      const end = currentPos + op.value.length
-      annotations.push({
-        type: 'DELETE',
-        original: op.value,
-        startIndex: start,
-        endIndex: end
-      })
-      currentPos += op.value.length + separatorLen
-    } else if (op.type === 'INSERT') {
-      annotations.push({
-        type: 'INSERT',
-        corrected: op.value,
-        position: currentPos
-      })
-    } else if (op.type === 'REPLACE') {
-      const start = currentPos
-      const end = currentPos + op.original.length
-      annotations.push({
-        type: 'REPLACE',
-        original: op.original,
-        corrected: op.corrected,
-        startIndex: start,
-        endIndex: end
-      })
-      currentPos += op.original.length + separatorLen
-    }
-  }
-  
-  return annotations
-}
-
-// ===== Helper: find word-level differences between original and corrected sentences =====
-const findDifferences = (original, corrected, language) => {
-  if (!original || !corrected || original === corrected) return []
-  
-  const tokenize = (str, lang) => {
-    if (lang === 'ja') {
-      // Japanese tokenization strategy:
-      // 1. Kanji sequences
-      // 2. Hiragana sequences
-      // 3. Katakana sequences
-      // 4. Punctuation marks (、。！？)
-      // 5. Spaces (preserved as-is)
-      const matches = str.match(/[\p{Script=Hani}]+|[\p{Script=Hiragana}]+|[\p{Script=Katakana}]+|[、。！？]|\s+/ug)
-      return matches || []
-    }
-    // English and other languages: split by whitespace
-    return str.match(/\S+/g) || []
-  }
-  const originalWords = tokenize(original, language)
-  const correctedWords = tokenize(corrected, language)
-  
-  const ops = computeWordDiff(originalWords, correctedWords)
-  
-  // Japanese has no spaces between tokens; English does
-  const hasSpaces = language !== 'ja'
-  const annotations = convertOpsToAnnotations(ops, original, originalWords, hasSpaces)
-  
-  return annotations
-}
-
-// ===== Helper: generate annotated HTML with spelling corrections =====
-const generateAnnotatedMessage = (originalText, annotations) => {
-  if (!annotations || annotations.length === 0) {
-    return { annotatedHtml: escapeHtml(originalText), missingWords: [] }
-  }
-  
-  const inserts = annotations.filter(a => a.type === 'INSERT')
-  const replacesAndDeletes = annotations.filter(a => a.type === 'REPLACE' || a.type === 'DELETE')
-  
-  // Process from end to start to avoid offset issues
-  let result = originalText
-  const sorted = [...replacesAndDeletes].sort((a, b) => b.startIndex - a.startIndex)
-  
-  for (const ann of sorted) {
-    const before = result.slice(0, ann.startIndex)
-    const after = result.slice(ann.endIndex)
-    
-    let annotated
-    if (ann.type === 'REPLACE') {
-      annotated = '<span class="spelling-correction">' + escapeHtml(ann.original) + '</span> <span class="spelling-suggestion">' + escapeHtml(ann.corrected) + '</span>'
-    } else {
-      annotated = '<span class="spelling-correction">' + escapeHtml(ann.original) + '</span>'
-    }
-    
-    result = before + annotated + after
-  }
-  
-  return {
-    annotatedHtml: result,
-    missingWords: inserts.map(i => i.corrected)
-  }
+  return result
 }
 
 // ===== Memoized bubble content — prevents React re-renders from clearing text selection =====
@@ -572,20 +429,30 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         setLoading(false)
         setAiStarted(false)
 
-        // 开场消息：评估模式下跳过 Hints 生成
+        // 开场消息：评估模式下跳过 Agent 调用
         if (!ctx?.isAssessment) {
-          generateHints(mainText, language).then(hintsResult => {
-            if (hintsResult && hintsResult.hints && hintsResult.hints.suggestions && hintsResult.hints.suggestions.length > 0) {
-              setAnalysisResults(prev => ({
-                ...prev,
-                [openingAiMsgId]: {
-                  ...prev[openingAiMsgId],
-                  hints: hintsResult.hints
-                }
-              }))
+          Promise.all([
+            generateHints(mainText, language, false, ctx?.goal),
+            extractCorrectionsFromReply(mainText, language, false)
+          ]).then(([hintsResult, extractionResult]) => {
+            // 使用 2D 的 cleanedReply 更新开场消息内容（清除教学建议）
+            if (extractionResult?.cleanedReply) {
+              setMessages(prev => prev.map(msg =>
+                msg.id === openingAiMsgId
+                  ? { ...msg, content: extractionResult.cleanedReply }
+                  : msg
+              ))
             }
+            setAnalysisResults(prev => ({
+              ...prev,
+              [openingAiMsgId]: {
+                ...prev[openingAiMsgId],
+                hints: hintsResult?.hints?.suggestions?.length > 0 ? hintsResult.hints : null,
+                extractedCorrections: extractionResult
+              }
+            }))
           }).catch(err => {
-            debug.error('[Agent 2C] 开场提示生成失败:', err)
+            debug.error('[Agent 2C/2D] 开场Agent调用失败:', err)
           })
         }
       }
@@ -1119,8 +986,8 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       setIsProcessing(prev => ({ ...prev, hints: true, extraction: true }))
 
       const [hintsSettled, extractionSettled] = await Promise.allSettled([
-        generateHints(mainText, language),
-        extractCorrectionsFromReply(mainText, language)
+        generateHints(mainText, language, effectiveLastRound, ctx?.goal),
+        extractCorrectionsFromReply(mainText, language, effectiveLastRound)
       ])
 
       setIsProcessing(prev => ({ ...prev, hints: false, extraction: false }))
@@ -1152,21 +1019,13 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       setTips(mergedTips)
       setKnowledgePointsState(extractedKps)
 
-      // ===== 构建 Correction 气泡数据（使用 diff 算法生成内联标注）=====
+      // ===== 构建 Correction 气泡数据（字符级 diff 标注）=====
       let correctionData = null
       if (correction && correction.original === text && correction.corrected !== text) {
-        // 使用 diff 算法生成内联标注 HTML
-        const differences = findDifferences(text, correction.corrected, language)
-        let annotatedHtml = ''
-
-        if (differences.length > 0) {
-          const { annotatedHtml: diffHtml } = generateAnnotatedMessage(text, differences)
-          annotatedHtml = diffHtml
-
-        } else {
-          // 降级：简单显示
-          annotatedHtml = `<span class="spelling-correction">${escapeHtml(text)}</span> → <span class="spelling-suggestion">${escapeHtml(correction.corrected)}</span>`
-        }
+        // 使用字符级 diff 生成带标注的 HTML
+        // - 删除的字符标为红色删除线 (.corr-removed)
+        // - 新增的字符标为绿色 (.corr-added)
+        const annotatedHtml = generateCorrectionHtml(text, correction.corrected)
 
         correctionData = {
           original: text,

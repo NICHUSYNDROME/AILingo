@@ -862,14 +862,15 @@
 }
 
 /* ===== Spelling correction styling in user messages ===== */
-.spelling-correction {
+/* Strategy C: removed chars = red strikethrough, added chars = green */
+.corr-removed {
   text-decoration: line-through;
   color: var(--error-color);
 }
 
-.spelling-suggestion {
+.corr-added {
   color: var(--success-color);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ===== Correction bubble for user messages ===== */
