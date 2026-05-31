@@ -14,7 +14,7 @@ import {
   summarizeTipsAndExtractKnowledge,
   extractSpecificKnowledge
 } from '../api'
-import { logActivity } from '../utils/learningLog'
+// learningLog removed — stats computed from conversation records directly
 import { speak, stopSpeaking, isSpeaking, isTTSAvailable } from '../utils/tts'
 import { getLocalDateString } from '../utils/date'
 import './ChatArea.css'
@@ -607,7 +607,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   
         return newCount
       })
-      logActivity('knowledge', increment, language)
+      // stats now computed from conversation records directly
     }
     lastConfirmedCountRef.current = currentCount
   }, [getConfirmedCount, isChatStarted])
@@ -723,7 +723,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     }
     setSummaryLoading(false)
     setSummaryDone(true)
-    logActivity('conversation', 1, language)
+    // stats now computed from conversation records directly
   }, [ctx, scrollToBottom, language])
 
   const handleEndConversation = useCallback(async () => {
@@ -746,7 +746,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
     if (currentMessages.length === 0) {
       setSummaryDone(true)
-      logActivity('conversation', 1, language)
+      // stats now computed from conversation records directly
       return
     }
 

@@ -1,8 +1,7 @@
 import { useMemo, memo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import HeatmapCalendar from './HeatmapCalendar'
-import { getWeeklyStats } from '../utils/learningLog'
-import { loadConversations, getConversationsByDate, deleteConversation } from '../utils/conversationHistory'
+import { loadConversations, getConversationsByDate, deleteConversation, getWeeklyConversationCount } from '../utils/conversationHistory'
 
 const ProgressDashboard = memo(function ProgressDashboard({
   language,
@@ -12,11 +11,6 @@ const ProgressDashboard = memo(function ProgressDashboard({
   onContinueConversation,
 }) {
   const { t } = useTranslation()
-  const weeklyStats = useMemo(() => getWeeklyStats(language), [language])
-
-  const confirmedCount = useMemo(() => {
-    return getConfirmedCount ? getConfirmedCount() : 0
-  }, [getConfirmedCount])
 
   const [selectedDate, setSelectedDate] = useState(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState(null)
@@ -24,6 +18,12 @@ const ProgressDashboard = memo(function ProgressDashboard({
   // Force re-render when conversations change (delete)
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  const weeklyConversationCount = useMemo(() => getWeeklyConversationCount(language), [language, refreshKey])
+
+  const confirmedCount = useMemo(() => {
+    return getConfirmedCount ? getConfirmedCount() : 0
+  }, [getConfirmedCount])
 
   // Load conversations, filtered by selectedDate if any
   const conversations = useMemo(() => {
@@ -57,6 +57,7 @@ const ProgressDashboard = memo(function ProgressDashboard({
             language={language}
             onDateClick={handleDateClick}
             selectedDate={selectedDate}
+            refreshKey={refreshKey}
           />
         </div>
 
@@ -68,7 +69,7 @@ const ProgressDashboard = memo(function ProgressDashboard({
           <div className="progress-right-inner">
             <div className="progress-stats">
               <div className="progress-stat-item">
-                <span className="progress-stat-value">{weeklyStats.conversation}</span>
+                <span className="progress-stat-value">{weeklyConversationCount}</span>
                 <span className="progress-stat-label">{t('conversationsThisWeek')}</span>
               </div>
               <div className="progress-stat-item">

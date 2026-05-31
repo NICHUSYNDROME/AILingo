@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getMonthlyData, getDayScore } from '../utils/learningLog'
+import { getMonthlyConversationCount } from '../utils/conversationHistory'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -10,30 +10,43 @@ const MONTH_NAMES = [
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /**
- * Get color for a given score using CSS variables for theme support.
- * Score ranges: 0 → light gray, 1-2 → light blue, 3-5 → medium blue, 6+ → dark blue
+ * Get color using relative intensity within the current month.
+ * Score 0 → empty; otherwise proportional to maxScore.
  */
-function getColor(score) {
+function getColor(score, maxScore) {
   if (score === 0) return 'var(--heatmap-empty)'
-  if (score <= 2) return 'var(--heatmap-level1)'
-  if (score <= 5) return 'var(--heatmap-level2)'
-  if (score <= 10) return 'var(--heatmap-level3)'
-  return 'var(--heatmap-level4)'
+  if (maxScore <= 1) return 'var(--heatmap-level4)'
+  const ratio = score / maxScore
+  if (ratio > 0.75) return 'var(--heatmap-level4)'
+  if (ratio > 0.5) return 'var(--heatmap-level3)'
+  if (ratio > 0.25) return 'var(--heatmap-level2)'
+  return 'var(--heatmap-level1)'
 }
 
-function HeatmapCalendar({ language = 'en', onDateClick = null, selectedDate = null }) {
+function HeatmapCalendar({ language = 'en', onDateClick = null, selectedDate = null, refreshKey = 0 }) {
   const { t } = useTranslation()
   const now = new Date()
   const [currentYear, setCurrentYear] = useState(now.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1) // 1-12
 
   const monthlyData = useMemo(
-    () => getMonthlyData(currentYear, currentMonth, language),
-    [currentYear, currentMonth, language]
+    () => getMonthlyConversationCount(currentYear, currentMonth, language),
+    [currentYear, currentMonth, language, refreshKey]
   )
 
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate()
   const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay() // 0=Sun
+
+  // Max conversation count this month (for relative colouring)
+  const maxScore = useMemo(() => {
+    let max = 0
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const s = monthlyData[key] || 0
+      if (s > max) max = s
+    }
+    return max
+  }, [monthlyData, currentYear, currentMonth, daysInMonth])
 
   // Build calendar grid
   const calendarDays = useMemo(() => {
@@ -47,8 +60,7 @@ function HeatmapCalendar({ language = 'en', onDateClick = null, selectedDate = n
     // Actual days
     for (let day = 1; day <= daysInMonth; day++) {
       const key = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dayData = monthlyData[key] || { conversation: 0, knowledge: 0, quiz: 0 }
-      const score = getDayScore(dayData)
+      const score = monthlyData[key] || 0
       const isToday = (() => {
         const today = new Date()
         return (
@@ -143,7 +155,7 @@ function HeatmapCalendar({ language = 'en', onDateClick = null, selectedDate = n
               className={`heatmap-cell ${cell.isToday ? 'heatmap-today' : ''} ${cell.score > 0 ? 'heatmap-clickable' : ''} ${selectedDate === cell.key ? 'heatmap-selected' : ''}`}
               style={{
                 ...CELL_STYLE,
-                backgroundColor: getColor(cell.score),
+                backgroundColor: getColor(cell.score, maxScore),
               }}
               title={`${cell.key}: ${cell.score} ${t('heatmapActivities')}`}
               onClick={cell.score > 0 && onDateClick ? () => onDateClick(cell.key) : undefined}

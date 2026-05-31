@@ -4,7 +4,7 @@ import { getItem, removeItem } from '../utils/storage'
 import { debug } from '../utils/debug'
 import { API_URL } from '../api/client'
 import { calculateNextReview } from '../utils/sm2'
-import { logActivity } from '../utils/learningLog'
+// learningLog removed — stats computed from conversation records directly
 import { getLocalDateString } from '../utils/date'
 
 /**
@@ -539,7 +539,7 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
       })
 
       // Log quiz activity
-      logActivity('quiz', questions.length, language)
+      // stats now computed from conversation records directly
     } catch (e) {
       debug.error('Quiz submission error:', e)
     }

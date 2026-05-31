@@ -11,6 +11,7 @@
 
 import { getItem, setItem } from './storage'
 import { debug } from './debug'
+import { formatLocalDate } from './date'
 
 const MAX_SESSIONS = 50
 
@@ -152,4 +153,50 @@ export function deleteConversation(language, id) {
     localStorage.setItem(key, json)
   } catch { /* ignore */ }
   setItem(key, json).catch(() => {})
+}
+
+/**
+ * Count conversations per day in a given month.
+ * @returns {Object} keyed by 'YYYY-MM-DD', each value is a count
+ */
+export function getMonthlyConversationCount(year, month, language) {
+  const list = loadFromStorage(language)
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const result = {}
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    result[key] = 0
+  }
+  for (const conv of list) {
+    if (conv.date && result[conv.date] !== undefined) {
+      result[conv.date]++
+    }
+  }
+  return result
+}
+
+/**
+ * Count total conversations this week (Mon-Sun).
+ * @returns {number}
+ */
+export function getWeeklyConversationCount(language) {
+  const list = loadFromStorage(language)
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(now)
+  monday.setDate(monday.getDate() + mondayOffset)
+  const weekDates = new Set()
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday)
+    d.setDate(d.getDate() + i)
+    weekDates.add(formatLocalDate(d))
+  }
+  let count = 0
+  for (const conv of list) {
+    if (conv.date && weekDates.has(conv.date)) {
+      count++
+    }
+  }
+  return count
 }
