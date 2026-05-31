@@ -81,8 +81,21 @@ export function updateConversation(language, session) {
   const key = getStorageKey(language)
   const list = loadFromStorage(language)
   const idx = list.findIndex((s) => s.id === session.id)
-  if (idx === -1) return // not found, do nothing
+  debug.log(`[updateConversation] 语言=${language} id=${session.id} 找到索引=${idx} endedNormally=${session.endedNormally} continueFromId=${session.continueFromId}`)
+  if (idx === -1) {
+    debug.warn(`[updateConversation] 未找到 id=${session.id}，尝试 saveConversation 兜底`)
+    // 兜底：保存为新记录
+    saveConversation(language, session)
+    return
+  }
+  // 替换第一个匹配项，并移除多余的重复项（防止 StrictMode 等场景残留重复）
   list[idx] = session
+  for (let i = list.length - 1; i > idx; i--) {
+    if (list[i].id === session.id) {
+      debug.warn(`[updateConversation] 移除重复记录 id=${session.id} at index=${i}`)
+      list.splice(i, 1)
+    }
+  }
   const json = JSON.stringify(list)
   try {
     localStorage.setItem(key, json)

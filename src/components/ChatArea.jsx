@@ -377,7 +377,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     const currentScenarios = SCENARIOS[s.language] || SCENARIOS.en
     const scenarioLabel = currentScenarios.find((sc) => sc.value === ctx.scenario)?.label || ctx.scenario
 
-    return {
+    const snapshot = {
       id: s.initialContinueFromId || `conv-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
       language: s.language,
       date: getLocalDateString(),
@@ -399,12 +399,15 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
       sessionConfirmedCount: s.sessionConfirmedCount || 0,
       continueFromId: s.initialContinueFromId || null,
     }
+    debug.log(`[buildSessionSnapshot] endedNormally=${endedNormally} id=${snapshot.id} continueFromId=${snapshot.continueFromId} initialContinueFromId=${s.initialContinueFromId}`)
+    return snapshot
   }, [])
 
   // ── 组件卸载时保存（对话被中断）────────────────────────────
   useEffect(() => {
     const handleBeforeUnload = () => {
       const s = unmountStateRef.current
+      debug.log(`[handleBeforeUnload] messages.length=${s.messages?.length || 0} summaryDone=${s.summaryDone} initialContinueFromId=${s.initialContinueFromId}`)
       if (!s.messages || s.messages.length === 0) return
       if (s.summaryDone) return
       // 用 buildSessionSnapshot（从 latestStateRef 读取）构建快照
@@ -416,6 +419,9 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
         const raw = localStorage.getItem(key)
         const list = raw ? JSON.parse(raw) : []
         if (!Array.isArray(list)) return
+        // 先移除同 id 的旧记录（防止 StrictMode 双挂载产生重复）
+        const existingIdx = list.findIndex((e) => e.id === session.id)
+        if (existingIdx !== -1) list.splice(existingIdx, 1)
         list.unshift(session)
         if (list.length > 50) list.length = 50
         localStorage.setItem(key, JSON.stringify(list))
@@ -424,6 +430,9 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
+      stopSpeaking()
+      playingMsgIdRef.current = null
+      setSpeakingMsgId(null)
       // 如果已通过 handleBackToIdle 或 summaryDone 保存，跳过卸载保存
       if (summarySavedRef.current) return
       handleBeforeUnload()
@@ -714,6 +723,9 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
 
   const handleEndConversation = useCallback(async () => {
     if (endingRef.current || summaryDone || summaryTriggered.current) return
+    stopSpeaking()
+    playingMsgIdRef.current = null
+    setSpeakingMsgId(null)
     endingRef.current = true
     setShowEndConfirm(false)
 
@@ -750,6 +762,9 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   }, [summaryDone, messages.length, onConversationEnd, buildSessionSnapshot])
 
   const handleBackToIdle = useCallback(() => {
+    stopSpeaking()
+    playingMsgIdRef.current = null
+    setSpeakingMsgId(null)
     setShowBackConfirm(false)
     debug.log('[ChatArea] 用户点击返回，放弃当前对话，不生成总结')
     if (messages.length > 0) {
@@ -1256,6 +1271,7 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
   }, [input, autoResize])
 
   const handleNewConversation = () => {
+    stopSpeaking()
     setMessages([])
     setInput('')
     setLoading(false)
