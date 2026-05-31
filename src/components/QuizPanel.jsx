@@ -126,6 +126,8 @@ function getReviewSystemPrompt(language) {
 
 For each subjective question, determine if the answer is correct or incorrect, and provide a brief explanation in Japanese.
 
+IMPORTANT — Use second-person pronouns (あなた/あなたの) in the explanation to address the user directly. For example: 「あなたの回答は正解です」or「あなたの回答は不正解です。正しい助詞は「は」です。」
+
 Return ONLY valid JSON, no other text. Use double quotes only.
 
 JSON format:
@@ -134,7 +136,7 @@ JSON format:
     {
       "questionIndex": 0,
       "correct": true or false,
-      "explanation": "Brief explanation in Japanese"
+      "explanation": "Brief explanation in Japanese (use あなた/あなたの)"
     }
   ]
 }
@@ -149,6 +151,8 @@ For 'joshi' type with joshiType 'fill': the answer is a single particle. Conside
 
 For each subjective question, determine if the answer is correct or incorrect, and provide a brief explanation.
 
+IMPORTANT — Address the user directly with second-person pronouns (you/your) in the explanation. For example: "Your answer is correct" or "You missed the verb tense here."
+
 Return ONLY valid JSON, no other text. Use double quotes only.
 
 JSON format:
@@ -157,7 +161,7 @@ JSON format:
     {
       "questionIndex": 0,
       "correct": true or false,
-      "explanation": "Brief explanation in English"
+      "explanation": "Brief explanation in English (use you/your)"
     }
   ]
 }
@@ -600,20 +604,20 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
           </div>
 
           <div className="quiz-review-questions">
+            {/* Wrong answers — shown directly */}
             {questions.map((q, idx) => {
               const review = reviewData.reviews[idx]
               const isCorrect = review ? review.correct : false
+              if (isCorrect) return null
               const userAnswer = answers[idx] || ''
 
               return (
                 <div
                   key={idx}
-                  className={`quiz-review-item ${isCorrect ? 'quiz-review-correct' : 'quiz-review-wrong'}`}
+                  className="quiz-review-item quiz-review-wrong"
                 >
                   <div className="quiz-review-q-header">
-                    <span className="quiz-review-status">
-                      {isCorrect ? '✓' : '✗'}
-                    </span>
+                    <span className="quiz-review-status">✗</span>
                     <span className="quiz-review-q-type">
                       {getTypeLabel(q.type, t)}
                     </span>
@@ -662,19 +666,17 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
 
                   <div className="quiz-review-answer-row">
                     <span className="quiz-review-answer-label">{t('quizYourAnswer')}</span>
-                    <span className={`quiz-review-answer-value ${isCorrect ? 'text-correct' : 'text-wrong'}`}>
+                    <span className="quiz-review-answer-value text-wrong">
                       {userAnswer || t('quizNoAnswer')}
                     </span>
                   </div>
 
-                  {!isCorrect && (
-                    <div className="quiz-review-answer-row">
-                      <span className="quiz-review-answer-label">{t('quizCorrectAnswer')}</span>
-                      <span className="quiz-review-answer-value text-correct">
-                        {q.answer}
-                      </span>
-                    </div>
-                  )}
+                  <div className="quiz-review-answer-row">
+                    <span className="quiz-review-answer-label">{t('quizCorrectAnswer')}</span>
+                    <span className="quiz-review-answer-value text-correct">
+                      {q.answer}
+                    </span>
+                  </div>
 
                   {review && review.explanation && (
                     <div className="quiz-review-explanation">
@@ -684,6 +686,52 @@ function QuizPanel({ knowledgePoints, getPointById, updatePointReview, onBackToH
                 </div>
               )
             })}
+
+            {/* Correct answers — collapsible, default closed */}
+            <details className="quiz-review-correct-details">
+              <summary className="quiz-review-correct-summary">
+                <span className="quiz-review-correct-summary-text">
+                  {t('quizCorrectCollapsed')}
+                </span>
+                <span className="quiz-review-correct-badge">{reviewData.correctCount}</span>
+              </summary>
+              {questions.map((q, idx) => {
+                const review = reviewData.reviews[idx]
+                const isCorrect = review ? review.correct : false
+                if (!isCorrect) return null
+                const userAnswer = answers[idx] || ''
+
+                return (
+                  <div
+                    key={idx}
+                    className="quiz-review-item quiz-review-correct"
+                  >
+                    <div className="quiz-review-q-header">
+                      <span className="quiz-review-status">✓</span>
+                      <span className="quiz-review-q-type">
+                        {getTypeLabel(q.type, t)}
+                      </span>
+                      <span className="quiz-review-q-number">Q{idx + 1}</span>
+                    </div>
+
+                    <div className="quiz-review-question">{q.question}</div>
+
+                    <div className="quiz-review-answer-row">
+                      <span className="quiz-review-answer-label">{t('quizYourAnswer')}</span>
+                      <span className="quiz-review-answer-value text-correct">
+                        {userAnswer || t('quizNoAnswer')}
+                      </span>
+                    </div>
+
+                    {review && review.explanation && (
+                      <div className="quiz-review-explanation">
+                        {review.explanation}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </details>
           </div>
 
           <div className="quiz-review-footer">

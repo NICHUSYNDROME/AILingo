@@ -75,6 +75,7 @@
   "quizResults": "確認結果",
   "quizCorrect": "正解",
   "quizCorrectExclaim": "正解！",
+  "quizCorrectCollapsed": "✅ 正解した問題",
   "quizCorrectAnswer": "正解: ",
   "quizYourAnswer": "あなたの回答: ",
   "quizNoAnswer": "（未回答）",

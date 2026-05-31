@@ -75,6 +75,7 @@
   "quizResults": "Quiz Results",
   "quizCorrect": "correct",
   "quizCorrectExclaim": "Correct!",
+  "quizCorrectCollapsed": "✅ Correct Questions",
   "quizCorrectAnswer": "The correct answer is: ",
   "quizYourAnswer": "Your answer: ",
   "quizNoAnswer": "(No answer)",

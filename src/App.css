@@ -804,10 +804,89 @@
 .quiz-review-questions {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 16px 20px 80px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  scroll-padding-bottom: 80px;
+}
+
+/* Collapsible section for correct answers */
+.quiz-review-correct-details {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.quiz-review-correct-details[open] {
+  padding-bottom: 12px;
+}
+
+.quiz-review-correct-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  list-style: none;
+  background: var(--code-bg);
+  transition: background 0.15s ease;
+}
+
+.quiz-review-correct-summary::-webkit-details-marker {
+  display: none;
+}
+
+.quiz-review-correct-summary::before {
+  content: '▶';
+  font-size: 14px;
+  transition: transform 0.2s ease;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.quiz-review-correct-details[open] > .quiz-review-correct-summary::before {
+  transform: rotate(90deg);
+}
+
+.quiz-review-correct-summary:hover {
+  background: var(--hover-bg);
+}
+
+.quiz-review-correct-summary:hover::before {
+  color: var(--text-primary);
+}
+
+.quiz-review-correct-summary-text {
+  flex: 1;
+  font-size: 14px;
+}
+
+.quiz-review-correct-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--success-color);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.quiz-review-correct-details[open] .quiz-review-item {
+  margin: 0 12px 8px;
 }
 
 .quiz-review-item {
