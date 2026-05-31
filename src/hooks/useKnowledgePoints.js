@@ -342,6 +342,14 @@ export function useKnowledgePoints(language = 'en') {
     })
   }, [schedulePersist])
 
+  /** Clear all knowledge points — state + localStorage + Electron storage */
+  const clearPoints = useCallback(() => {
+    setKnowledgePoints([])
+    // Immediately persist the empty array to both storages
+    persistNow([])
+    debug.log('[useKnowledgePoints] 已清空所有知识点')
+  }, [persistNow])
+
   return {
     knowledgePoints,
     addPoint,
@@ -354,5 +362,6 @@ export function useKnowledgePoints(language = 'en') {
     getConfirmedCount,
     updatePointReview,
     updatePoint,
+    clearPoints,
   }
 }

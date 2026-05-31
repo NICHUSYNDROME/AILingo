@@ -105,6 +105,7 @@ function App() {
     getConfirmedCount,
     updatePointReview,
     updatePoint,
+    clearPoints,
   } = useKnowledgePoints(language)
 
   // Count confirmed points due for review today
@@ -188,20 +189,23 @@ function App() {
 
   const handleSaveConversation = useCallback((sessionData) => {
     if (!sessionData) return
+    debug.log(`[handleSaveConversation] language=${language} id=${sessionData.id} continueFromId=${sessionData.continueFromId} endedNormally=${sessionData.endedNormally}`)
     if (sessionData.continueFromId) {
       // 继续的对话：更新原记录
+      debug.log('[handleSaveConversation] → updateConversation')
       updateConversation(language, sessionData)
     } else {
+      debug.log('[handleSaveConversation] → saveConversation')
       saveConversation(language, sessionData)
     }
+    // 清除继续对话状态，避免影响后续新对话
+    setContinueConversationData(null)
   }, [language])
 
   // Clear all knowledge points for current language
   const handleClearKnowledge = useCallback(() => {
-    const STORAGE_KEY = language === 'ja' ? 'ja_knowledge_points' : 'en_knowledge_points'
-    localStorage.removeItem(STORAGE_KEY)
-    window.location.reload()
-  }, [language])
+    clearPoints()
+  }, [clearPoints])
 
   // ── Delegate rendering to AppView ──────────────────────────────
   return (
