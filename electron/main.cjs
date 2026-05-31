@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const { startTTSServer, createTTSHandler } = require('../server/tts-proxy.cjs');
 const http = require('http');
+const { cleanup } = require('../scripts/cleanup.cjs');
 
 // === 修复双击打开时的工作目录问题 ===
 // 将工作目录切换到 Resources/app/，确保相对路径正确解析
@@ -115,6 +116,53 @@ app.whenReady().then(() => {
 
   ipcMain.handle('read-settings', () => readSettingsFile());
   ipcMain.handle('write-settings', (_, data) => writeSettingsFile(data));
+
+  // === Debug log file IPC ===
+  function getDebugLogDir() {
+    const logDir = path.join(process.cwd(), 'ai-feedback', 'debug-logs');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    return logDir;
+  }
+
+  ipcMain.handle('save-debug-log', (_, filename, data) => {
+    try {
+      const logDir = getDebugLogDir();
+      const filePath = path.join(logDir, filename);
+      fs.writeFileSync(filePath, typeof data === 'string' ? data : JSON.stringify(data, null, 2), 'utf-8');
+      console.log('[AILingo] Debug log saved:', filePath);
+      return true;
+    } catch (e) {
+      console.error('[AILingo] Failed to save debug log:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('cleanup-old-logs', () => {
+    try {
+      const result = cleanup(true); // execute actual deletion
+      return { success: true, deleted: result.deleted.length, kept: result.kept };
+    } catch (e) {
+      console.error('[AILingo] Cleanup failed:', e);
+      return { success: false, error: e.message };
+    }
+  });
+  // ===========================
+
+  // Run cleanup on startup (non-blocking)
+  setImmediate(() => {
+    try {
+      const result = cleanup(true);
+      if (result.deleted.length > 0) {
+        console.log(`[AILingo] Startup cleanup: removed ${result.deleted.length} old files`);
+      }
+    } catch (e) {
+      console.error('[AILingo] Startup cleanup error:', e.message);
+    }
+  });
+  // ===========================
+
   ipcMain.handle('open-external', async (event, url) => {
     if (url && typeof url === 'string') {
       await shell.openExternal(url);

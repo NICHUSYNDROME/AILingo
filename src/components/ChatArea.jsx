@@ -590,6 +590,16 @@ function ChatArea({ isChatStarted, conversationContextRef, onSidebarUpdate, onRe
     }
     setSummaryLoading(false)
     setSummaryDone(true)
+
+    // Export debug log to disk (Electron only)
+    if (window.electronAPI?.saveDebugLog) {
+      try {
+        const aiLogs = window.__aiLogs || []
+        const ts = new Date().toISOString().replace(/[:.]/g, '-')
+        window.electronAPI.saveDebugLog(`round-${ts}.json`, JSON.stringify(aiLogs, null, 2))
+      } catch { /* silent fail in browser dev mode */ }
+    }
+
     // stats now computed from conversation records directly
   }, [ctx, scrollToBottom, language])
 
